@@ -13,6 +13,7 @@ import           GHC.Generics
 import           Lib                 as L
 import           Options.Generic
 import           System.Process
+import           System.Random       (newStdGen)
 
 -- | A configuration type
 data Session = StartBy
@@ -36,8 +37,15 @@ main = do
   print s
   tz <- getCurrentTimeZone
   t <- getCurrentTime
+  g <- newStdGen
   print ("Times offset from: " ++ (show $ toLocal tz t))
-  printTarget $ mkSchedule s tz t
+  let ta = mkSchedule s tz t
+      sh = getSchedule ta
+    --
+  case sh of
+    Just sh' -> do print ("Schedule: " ++ show sh')
+                   print $ "Generated time " ++ (show $ genTime g tz sh')
+    _        -> print "No schedule computed"
     where printTarget (L.Scheduled sc ioa) = print sc
           printTarget (L.Immediate m)      = print "Immediate: action"
 
@@ -51,7 +59,6 @@ toSchedule (EndBy e c)     tz t = L.Bounded (toLocal tz (addUTCTime (nomTime e) 
 nomTime :: Int -> NominalDiffTime
 nomTime b = (realToFrac secs) :: NominalDiffTime
   where secs = b `div` 1000
-
 
 toLocal :: TimeZone -> UTCTime -> LocalTime
 toLocal tz t = utcToLocalTime tz t
