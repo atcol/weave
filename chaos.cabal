@@ -1,0 +1,45 @@
+name:                chaos
+version:             0.1.0.0
+synopsis:            IO scheduling and testing API and CLI
+description:         Predictable and unpredictable scheduling API for IO actions
+homepage:            https://github.com/atcol/chaos#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Alex Collins
+maintainer:          atc@alexcollins.org
+copyright:           2017 Alex Collins
+category:            API
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Lib
+  build-depends:       base >= 4.7 && < 5
+                     , time
+  default-language:    Haskell2010
+
+executable chaos
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , chaos
+                     , process
+                     , optparse-generic
+                     , time
+  default-language:    Haskell2010
+
+test-suite chaos-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , chaos
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/atcol/chaos
