@@ -1,5 +1,6 @@
 # chaos
 ![Travis CI build status](https://travis-ci.org/atcol/chaos.svg?branch=master)
+
 An API and CLI for (un)predictable scheduling.
 
 ## Building
