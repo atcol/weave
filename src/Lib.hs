@@ -9,6 +9,7 @@ module Lib
     immediate,
     genTime,
     getSchedule,
+    randomSeconds,
     result,
     scheduled
     ) where
@@ -18,7 +19,7 @@ import           Data.Time.Clock        (NominalDiffTime, addUTCTime,
                                          diffUTCTime)
 import           Data.Time.LocalTime    (LocalTime, TimeZone, localTimeToUTC,
                                          utcToLocalTime)
-import           System.Random          (RandomGen, randomR)
+import           System.Random          (RandomGen, newStdGen, randomR)
 
 data Bound = Upper | Lower deriving (Show, Eq, Ord)
 
@@ -50,11 +51,11 @@ result (Immediate a)   = a
 result (Scheduled _ a) = a
 
 -- | Randomly pick a time compatible with the given schedule, using the random gen provided
-genTime :: RandomGen g => g -> TimeZone -> Schedule -> LocalTime
-genTime rg tz (Interval st en) = utcToLocalTime tz (randTime st)
-        -- FIXME this is awful
+genTime :: RandomGen g => TimeZone -> Schedule -> g -> LocalTime
+genTime tz (Interval st en) rg = utcToLocalTime tz (randTime st)
   where randTime st = addUTCTime randStart (localTimeToUTC tz st)
-        diff = read $ show $ diffUTCTime (localTimeToUTC tz st) (localTimeToUTC tz en)
+        -- FIXME the following is awful
+        diff = floor (diffUTCTime (localTimeToUTC tz st) (localTimeToUTC tz en))
         randStart = randomSeconds rg diff
 
 randomSeconds :: RandomGen g => g -> Int -> NominalDiffTime
