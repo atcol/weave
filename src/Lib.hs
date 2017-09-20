@@ -27,7 +27,7 @@ data Bound = Upper | Lower deriving (Show, Eq, Ord)
 data Schedule = -- | Perform something within the start and end times
                 Interval { start :: LocalTime, end :: LocalTime }
                 | -- | Begin after, or by, the given time
-                Bounded { time :: LocalTime, bound :: Bound, withinMs :: Maybe Int }
+                Bounded { time :: LocalTime, bound :: Bound }
               deriving (Show, Eq)
 
 -- | The target action to be scheduled

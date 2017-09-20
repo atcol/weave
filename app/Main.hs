@@ -17,12 +17,15 @@ import           System.Random       (newStdGen)
 
 -- | A configuration type
 data Session =
+  -- | Execute @cmd@ within the period specified
   Between
     { startMs :: Int, endMs :: Int, cmd  :: String }
+    -- | Execute @cmd@ after @startMs@
   | StartBy
-    { diffMs :: Int , withinMs :: Int , cmd :: String }
+    { startMs :: Int , cmd :: String }
+    -- | Execute @cmd@ before @endMs@
   | EndBy
-    { endByMs :: Int , cmd :: String }
+    { endMs :: Int , cmd :: String }
   deriving (Show, Generic)
 
 instance ParseRecord Session
@@ -50,8 +53,8 @@ mkSchedule s tz t = L.scheduled (callCommand (cmd s)) $ toSchedule s tz t
 
 toSchedule :: Session -> TimeZone -> UTCTime -> L.Schedule
 toSchedule (Between s e _) tz t = L.Interval (toLocal tz (addUTCTime (nomTime s) t)) (toLocal tz (addUTCTime (nomTime e) t))
-toSchedule (StartBy b w _) tz t = L.Bounded (toLocal tz (addUTCTime (nomTime b) t)) Lower (Just w)
-toSchedule (EndBy e _)     tz t = L.Bounded (toLocal tz (addUTCTime (nomTime e) t)) Upper Nothing
+toSchedule (StartBy b _) tz t = L.Bounded (toLocal tz (addUTCTime (nomTime b) t)) Lower
+toSchedule (EndBy e _)     tz t = L.Bounded (toLocal tz (addUTCTime (nomTime e) t)) Upper
 
 nomTime :: Int -> NominalDiffTime
 nomTime b = (realToFrac secs) :: NominalDiffTime
