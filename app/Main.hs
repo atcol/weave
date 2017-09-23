@@ -43,10 +43,11 @@ main = do
     --
   case sh of
     Just sh' -> do print ("Schedule: " ++ show sh')
-                   print $ "Generated time " ++ (show $ genTime tz sh' g)
+                   print $ "Generated time " ++ (show $ gen tz sh' g)
     _        -> print "No schedule computed"
     where printTarget (L.Scheduled sc ioa) = print sc
           printTarget (L.Immediate m)      = print "Immediate: action"
+          gen tz (Interval s e) g = genTime tz s e g
 
 mkSchedule :: Session -> TimeZone -> UTCTime -> (Target (IO ()))
 mkSchedule s tz t = L.scheduled (callCommand (cmd s)) $ toSchedule s tz t

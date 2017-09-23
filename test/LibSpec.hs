@@ -35,18 +35,24 @@ spec = do
       it "Always produces times within range" $ property prop_validRange
 
     context "genTime" $ do
-      it "Produces times compatible with the given schedule" $ property prop_genTime_CreatesValidLocalTime_WhenScheduleAfterNow
+      it "Produces times compatible with the given schedule" $ property prop_ValidLocalTime_WhenAfterNow
 
-prop_genTime_CreatesValidLocalTime_WhenScheduleAfterNow tz s@(Bounded t b) = do
+prop_ValidLocalTime_WhenAfterNow tz s@(Bounded t b) = do
   g <- newStdGen
-  genTime tz s g `shouldSatisfy` validInterval s
-prop_inSchedule_AfterNow tz s@(Interval st end) = do
-  g <- newStdGen
-  now <- getCurrentTime
   nowTz <- getCurrentTimeZone
-  -- Must be after now for this property
-  if (st <= (utcToLocalTime nowTz now)) then True `shouldBe` True
-                                  else genTime tz s g `shouldSatisfy` validInterval s
+  nowUtc <- getCurrentTime
+  let now = (utcToLocalTime tz nowUtc)
+  if (t <= now) then True `shouldBe` True
+                else case b of
+                      Upper -> genTime tz now t g `shouldSatisfy` validInterval s
+                      Lower -> genTime tz t now g `shouldSatisfy` validInterval s
+prop_ValidLocalTime_WhenAfterNow tz s@(Interval st end) = do
+  g <- newStdGen
+  nowTz <- getCurrentTimeZone
+  nowUtc <- getCurrentTime
+  let now = (utcToLocalTime tz nowUtc)
+  if (st <= now) then True `shouldBe` True
+                 else genTime tz st end g `shouldSatisfy` validInterval s
 
 validInterval :: Schedule -> Maybe LocalTime -> Bool
 validInterval (Interval st end) (Just lt) = (lt >= st) && (lt <= end)
