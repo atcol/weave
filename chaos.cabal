@@ -42,6 +42,7 @@ test-suite chaos-test
                      , chaos
                      , hspec
                      , QuickCheck
+                     , quickcheck-instances
                      , quickcheck-io
                      , random
                      , time

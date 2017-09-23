@@ -6,7 +6,7 @@ module Lib
     Bound (..),
 
     -- | Functions
-    immediate,
+    immediately,
     genTime,
     getSchedule,
     randomSeconds,
@@ -40,8 +40,8 @@ getSchedule :: MonadIO m => Target (m a) -> Maybe Schedule
 getSchedule (Immediate _)   = Nothing
 getSchedule (Scheduled s _) = Just s
 
-immediate :: MonadIO m => m a -> Target (m a)
-immediate ioa = Immediate ioa
+immediately :: MonadIO m => m a -> Target (m a)
+immediately ioa = Immediate ioa
 
 scheduled :: MonadIO m => m a -> Schedule -> Target (m a)
 scheduled ioa s = Scheduled s ioa
@@ -50,9 +50,9 @@ result :: MonadIO m => Target (m a) -> m a
 result (Immediate a)   = a
 result (Scheduled _ a) = a
 
--- | Randomly pick a time compatible with the given schedule, using the random gen provided
-genTime :: RandomGen g => TimeZone -> Schedule -> g -> LocalTime
-genTime tz (Interval st en) rg = utcToLocalTime tz (randTime st)
+-- | Randomly pick a time compatible with the given schedule
+genTime :: RandomGen g => TimeZone -> Schedule -> g -> Maybe LocalTime
+genTime tz (Interval st en) rg = Just $ utcToLocalTime tz (randTime st)
   where randTime st = addUTCTime randStart (localTimeToUTC tz st)
         -- FIXME the following is awful
         diff = floor (diffUTCTime (localTimeToUTC tz st) (localTimeToUTC tz en))
