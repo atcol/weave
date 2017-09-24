@@ -5,8 +5,7 @@ An API and CLI for (un)predictable scheduling.
 ## Motivation
 
 Chaos is an experiment to understand the idea of parameterising unpredictability
-when integrating with actions -- system calls, anything "IO-like" be it local
-or remote -- using several concepts:
+when integrating with actions using these concepts:
 
  * an action that encapsulates a side-effect
  * temporal and spatial parameters
