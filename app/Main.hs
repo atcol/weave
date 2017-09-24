@@ -21,12 +21,6 @@ data Session =
   -- | Execute @cmd@ within the period specified
   Between
     { startMs :: Int, endMs :: Int, cmd  :: String }
-    -- | Execute @cmd@ after @startMs@
-  | StartBy
-    { startMs :: Int , cmd :: String }
-    -- | Execute @cmd@ before @endMs@
-  | EndBy
-    { endMs :: Int , cmd :: String }
   deriving (Show, Generic)
 
 instance ParseRecord Session
@@ -34,7 +28,6 @@ instance ParseRecord Session
 main :: IO ()
 main = do
   s <- getRecord "Chaos" :: IO Session
-  print s
   tz <- getCurrentTimeZone
   now <- getCurrentTime
   g <- newStdGen
