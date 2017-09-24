@@ -31,14 +31,13 @@ data Bound = Upper | Lower deriving (Show, Eq, Ord)
 -- | The scheduling type, representing when an action should occur, and within which bounds
 data Schedule = -- | Perform something within the start and end times
                 Interval { start :: LocalTime, end :: LocalTime }
-                -- | Begin after, or by, the given time
-                | Bounded { time :: LocalTime, bound :: Bound }
+                -- | The schedule has passed
                 | Finished
-                deriving (Show, Eq)
+                deriving (Read, Show, Eq)
 
 -- | The target action to be scheduled
 data Target m = Target { sched :: Schedule, action :: m }
-              deriving (Show, Eq, Functor)
+  deriving (Read, Show, Eq, Functor)
 
 -- | Retrieve the required schedule
 getSchedule :: MonadIO m => Target (m a) -> Maybe Schedule
@@ -54,25 +53,16 @@ result (Target _ a) = a
 
 startTime :: Schedule -> Maybe LocalTime
 startTime (Interval s _)    = Just s
-startTime (Bounded s Lower) = Just s
-startTime _                 = Nothing
 
 -- | Randomly pick a time compatible with the given start and end times
-genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (Either String LocalTime)
-genTime (Bounded t b) rg = do
-  tz <- liftIO $ getCurrentTimeZone
-  now <- liftIO $ getCurrentTime
-  g <- liftIO $ newStdGen
-  case b of
-    Upper -> genTime (Interval (ltNow tz   (addUTCTime (- (fst (randomSeconds g 99999)))  now)) t) rg
-    Lower -> genTime (Interval t (ltNow tz ((addUTCTime    (fst (randomSeconds g 99999))) now)))    rg
-  where ltNow tz n = utcToLocalTime tz n
+genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (Maybe LocalTime, g)
 genTime (Interval s e) rg = do
   tz <- liftIO $ getCurrentTimeZone
-  now <- liftIO $ getCurrentTime
-  if safeTime s e then return $ Right $ rt tz
-                  else return $ Left "Start is > end"
-  where rt tz = fst $ randomTimeBetween tz s e rg
+  if (s < e) then return $ mapRes $ rt tz
+             else return (Nothing, rg)
+  where rt tz = randomTimeBetween tz s e rg
+        mapRes (Just (a, b)) = (Just a, b)
+        mapRes Nothing       = (Nothing, rg)
 
 diff :: TimeZone -> LocalTime -> LocalTime -> NominalDiffTime
 diff tz st en = diffUTCTime (localTimeToUTC tz st) (localTimeToUTC tz en)
@@ -83,8 +73,9 @@ safeTime s e = s < e
 randomSeconds :: RandomGen g => g -> Int -> (NominalDiffTime, g)
 randomSeconds rg max = first realToFrac $ randomR (0, max) rg
 
-randomTimeBetween :: RandomGen g => TimeZone -> LocalTime -> LocalTime -> g -> (LocalTime, g)
+randomTimeBetween :: RandomGen g => TimeZone -> LocalTime -> LocalTime -> g -> Maybe (LocalTime, g)
 randomTimeBetween tz s e rg =
-  first
-      (utcToLocalTime tz . (`addUTCTime` (localTimeToUTC tz s)))
-          (randomSeconds rg (floor (diff tz s e)))
+  if (s > e) then Nothing
+             else Just $ first
+                    (utcToLocalTime tz . (`addUTCTime` (localTimeToUTC tz s)))
+                        (randomSeconds rg (abs $ floor (diff tz s e)))

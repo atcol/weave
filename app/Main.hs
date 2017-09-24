@@ -52,8 +52,6 @@ mkTarget s tz t = L.scheduled (callCommand (cmd s)) $ toSchedule s tz t
 
 toSchedule :: Session -> TimeZone -> UTCTime -> L.Schedule
 toSchedule (Between s e _) tz t = L.Interval (toLocal tz (addUTCTime (nomTime s) t)) (toLocal tz (addUTCTime (nomTime e) t))
-toSchedule (StartBy b _) tz t = L.Bounded (toLocal tz (addUTCTime (nomTime b) t)) Lower
-toSchedule (EndBy e _)     tz t = L.Bounded (toLocal tz (addUTCTime (nomTime e) t)) Upper
 
 nomTime :: Int -> NominalDiffTime
 nomTime b = realToFrac secs
