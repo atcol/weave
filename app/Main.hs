@@ -6,6 +6,7 @@
 module Main where
 
 import           Control.Concurrent.MVar (MVar, newMVar)
+import           Data.Maybe              (fromMaybe)
 import           Data.Time.Clock         (NominalDiffTime, UTCTime, addUTCTime,
                                           getCurrentTime)
 import           Data.Time.LocalTime     (LocalTime, TimeZone,
@@ -20,7 +21,7 @@ import           System.Random           (newStdGen)
 data Session =
   -- | Execute @cmd@ within the period specified
   Between
-    { startMs :: Int, endMs :: Int, cmd  :: String }
+    { startMs :: Maybe Int, endMs :: Int, cmd :: String }
   deriving (Show, Generic)
 
 instance ParseRecord Session
@@ -42,7 +43,7 @@ mkTarget :: Session -> TimeZone -> UTCTime -> (Target (IO ()))
 mkTarget s tz t = L.scheduled (callCommand (cmd s)) $ toSchedule s tz t
 
 toSchedule :: Session -> TimeZone -> UTCTime -> L.Schedule
-toSchedule (Between s e _) tz t = L.Interval (toLocal tz (addUTCTime (nomTime s) t)) (toLocal tz (addUTCTime (nomTime e) t)) tz
+toSchedule (Between s e _) tz t = L.Interval (toLocal tz (addUTCTime (nomTime (fromMaybe 0 s)) t)) (toLocal tz (addUTCTime (nomTime e) t)) tz
 
 nomTime :: Int -> NominalDiffTime
 nomTime b = realToFrac secs
