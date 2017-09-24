@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
-module Data.Time.Schedule
+module Data.Time.Schedule.Chaos
   (
     -- | Types
     Schedule (..),
@@ -15,7 +15,7 @@ module Data.Time.Schedule
     runTarget,
     startTime,
     scheduled
-  ) where
+    ) where
 
 import           Control.Concurrent     (forkIO, takeMVar, threadDelay)
 import           Control.Monad.IO.Class (MonadIO, liftIO)

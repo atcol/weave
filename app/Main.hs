@@ -5,17 +5,17 @@
 
 module Main where
 
-import           Control.Concurrent.MVar (MVar, newMVar)
-import           Data.Maybe              (fromMaybe)
-import           Data.Time.Clock         (NominalDiffTime, UTCTime, addUTCTime,
-                                          getCurrentTime)
-import           Data.Time.LocalTime     (LocalTime, TimeZone,
-                                          getCurrentTimeZone, utcToLocalTime)
+import           Control.Concurrent.MVar  (MVar, newMVar)
+import           Data.Maybe               (fromMaybe)
+import           Data.Time.Clock          (NominalDiffTime, UTCTime, addUTCTime,
+                                           getCurrentTime)
+import           Data.Time.LocalTime      (LocalTime, TimeZone,
+                                           getCurrentTimeZone, utcToLocalTime)
+import           Data.Time.Schedule.Chaos as C
 import           GHC.Generics
-import           Lib                     as L
 import           Options.Generic
 import           System.Process
-import           System.Random           (newStdGen)
+import           System.Random            (newStdGen)
 
 -- | A configuration type
 data Session =
@@ -37,13 +37,13 @@ main = do
   case sh of
     Just sh' -> runTarget ta
     _        -> print "No schedule computed"
-    where printTarget (L.Target sc ioa) = print sc
+    where printTarget (C.Target sc ioa) = print sc
 
 mkTarget :: Session -> TimeZone -> UTCTime -> (Target (IO ()))
-mkTarget s tz t = L.scheduled (callCommand (cmd s)) $ toSchedule s tz t
+mkTarget s tz t = C.scheduled (callCommand (cmd s)) $ toSchedule s tz t
 
-toSchedule :: Session -> TimeZone -> UTCTime -> L.Schedule
-toSchedule (Between s e _) tz t = L.Interval (toLocal tz (addUTCTime (nomTime (fromMaybe 0 s)) t)) (toLocal tz (addUTCTime (nomTime e) t)) tz
+toSchedule :: Session -> TimeZone -> UTCTime -> C.Schedule
+toSchedule (Between s e _) tz t = C.Interval (toLocal tz (addUTCTime (nomTime (fromMaybe 0 s)) t)) (toLocal tz (addUTCTime (nomTime e) t)) tz
 
 nomTime :: Int -> NominalDiffTime
 nomTime b = realToFrac secs

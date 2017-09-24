@@ -1,10 +1,10 @@
-module LibSpec ( spec ) where
+module Data.Time.Schedule.ChaosSpec ( spec ) where
 
 import           Data.Time.Clock           (NominalDiffTime, addUTCTime,
                                             getCurrentTime)
 import           Data.Time.LocalTime       (LocalTime, getCurrentTimeZone,
                                             utcToLocalTime)
-import           Lib                       (Bound (..), Schedule (..), genTime,
+import           Data.Time.Schedule.Chaos  (Bound (..), Schedule (..), genTime,
                                             randomSeconds, randomTimeBetween)
 import           System.Random             (RandomGen, newStdGen)
 import           Test.Hspec

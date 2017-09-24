@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Lib
+  exposed-modules:     Data.Time.Schedule.Chaos
   build-depends:       base >= 4.7 && < 5
                      , random
                      , time
@@ -37,7 +37,7 @@ test-suite chaos-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
-  other-modules:       LibSpec
+  other-modules:       Data.Time.Schedule.ChaosSpec
   build-depends:       base
                      , chaos
                      , hspec
