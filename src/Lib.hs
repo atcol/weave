@@ -17,6 +17,7 @@ module Lib
     scheduled
     ) where
 
+import           Control.Concurrent     (forkIO, takeMVar, threadDelay)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Data.Bifunctor         (first)
 import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
@@ -82,6 +83,7 @@ randomTimeBetween tz s e rg =
 
 runTarget :: MonadIO m => Target (m a) -> m a
 runTarget (Target (Interval s e tz) a) = do
-  liftIO $ print "lol"
+  liftIO $ threadDelay delay
   a
-  where delay = diff tz s e
+    where tDiff = (round $ diff tz s e) :: Int
+          delay = abs $ tDiff * 1000 * 1000

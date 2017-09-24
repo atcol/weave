@@ -5,7 +5,6 @@
 
 module Main where
 
-import           Control.Concurrent      (forkIO, takeMVar, threadDelay)
 import           Control.Concurrent.MVar (MVar, newMVar)
 import           Data.Time.Clock         (NominalDiffTime, UTCTime, addUTCTime,
                                           getCurrentTime)
@@ -39,13 +38,10 @@ main = do
   tz <- getCurrentTimeZone
   now <- getCurrentTime
   g <- newStdGen
-  print ("Times offset from: " ++ (show $ toLocal tz now))
   let ta = mkTarget s tz now
       sh = getSchedule ta
   case sh of
-    Just sh' -> do print ("Schedule: " ++ show sh')
-                   gen <- genTime sh' g
-                   print $ "Generated time " ++ (show gen)
+    Just sh' -> do gen <- genTime sh' g
                    runTarget ta
     _        -> print "No schedule computed"
     where printTarget (L.Target sc ioa) = print sc
