@@ -37,33 +37,21 @@ spec = do
     context "genTime" $ do
       it "Produces times compatible with the given schedule" $ property prop_ValidLocalTime_WhenAfterNow
 
-prop_ValidLocalTime_WhenAfterNow tz s@(Bounded t b) = do
+prop_ValidLocalTime_WhenAfterNow s = do
   g <- newStdGen
-  nowTz <- getCurrentTimeZone
-  nowUtc <- getCurrentTime
-  let now = (utcToLocalTime tz nowUtc)
-  if (t <= now) then True `shouldBe` True
-                else case b of
-                      Upper -> genTime tz now t g `shouldSatisfy` validInterval s
-                      Lower -> genTime tz t now g `shouldSatisfy` validInterval s
-prop_ValidLocalTime_WhenAfterNow tz s@(Interval st end) = do
-  g <- newStdGen
-  nowTz <- getCurrentTimeZone
-  nowUtc <- getCurrentTime
-  let now = (utcToLocalTime tz nowUtc)
-  if (st <= now) then True `shouldBe` True
-                 else genTime tz st end g `shouldSatisfy` validInterval s
+  mlt <- genTime s g
+  mlt `shouldSatisfy` validInterval s
 
-validInterval :: Schedule -> Maybe LocalTime -> Bool
-validInterval (Interval st end) (Just lt) = (lt >= st) && (lt <= end)
-validInterval (Bounded t Upper) (Just lt) = lt < t
-validInterval (Bounded t Lower) (Just lt) = lt > t
-validInterval _ _                         = False
+validInterval :: Schedule -> Either String LocalTime -> Bool
+validInterval (Interval st end) (Right lt) = (lt >= st) && (lt <= end)
+validInterval (Interval st end) (Left err)   = err == "Interval end time is before now"
+validInterval (Bounded t Upper) (Right lt) = lt < t
+validInterval (Bounded t Upper) (Left err) = err == "Upper bound time is before now"
+validInterval (Bounded t Lower) (Right lt) = lt > t
 
---prop_validRange :: RandomGen g => g -> Int -> (NominalDiffTime -> Bool)
 prop_validRange v = (v > 0) ==> do
   g <- newStdGen
-  randomSeconds g v `shouldSatisfy` validRange
+  randomSeconds g v `shouldSatisfy` validRange . fst
 
 validRange :: NominalDiffTime -> Bool
 validRange v = (v >= 0) && (v <= (realToFrac mx))

@@ -35,22 +35,20 @@ main = do
   s <- getRecord "Chaos" :: IO Session
   print s
   tz <- getCurrentTimeZone
-  t <- getCurrentTime
+  now <- getCurrentTime
   g <- newStdGen
-  print ("Times offset from: " ++ (show $ toLocal tz t))
-  let ta = mkSchedule s tz t
+  print ("Times offset from: " ++ (show $ toLocal tz now))
+  let ta = mkTarget s tz now
       sh = getSchedule ta
-    --
   case sh of
     Just sh' -> do print ("Schedule: " ++ show sh')
-                   print $ "Generated time " ++ (show $ gen tz sh' g)
+                   gen <- genTime sh' g
+                   print $ "Generated time " ++ (show gen)
     _        -> print "No schedule computed"
-    where printTarget (L.Scheduled sc ioa) = print sc
-          printTarget (L.Immediate m)      = print "Immediate: action"
-          gen tz (Interval s e) g = genTime tz s e g
+    where printTarget (L.Target sc ioa) = print sc
 
-mkSchedule :: Session -> TimeZone -> UTCTime -> (Target (IO ()))
-mkSchedule s tz t = L.scheduled (callCommand (cmd s)) $ toSchedule s tz t
+mkTarget :: Session -> TimeZone -> UTCTime -> (Target (IO ()))
+mkTarget s tz t = L.scheduled (callCommand (cmd s)) $ toSchedule s tz t
 
 toSchedule :: Session -> TimeZone -> UTCTime -> L.Schedule
 toSchedule (Between s e _) tz t = L.Interval (toLocal tz (addUTCTime (nomTime s) t)) (toLocal tz (addUTCTime (nomTime e) t))
@@ -58,7 +56,7 @@ toSchedule (StartBy b _) tz t = L.Bounded (toLocal tz (addUTCTime (nomTime b) t)
 toSchedule (EndBy e _)     tz t = L.Bounded (toLocal tz (addUTCTime (nomTime e) t)) Upper
 
 nomTime :: Int -> NominalDiffTime
-nomTime b = (realToFrac secs) :: NominalDiffTime
+nomTime b = realToFrac secs
   where secs = b `div` 1000
 
 toLocal :: TimeZone -> UTCTime -> LocalTime
