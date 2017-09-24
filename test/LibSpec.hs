@@ -19,7 +19,8 @@ instance Arbitrary Schedule where
           interval = do
                   randSt <- arbitrary
                   randEnd <- arbitrary
-                  return $ Interval randSt randEnd
+                  rtz <- arbitrary
+                  return $ Interval randSt randEnd rtz
 
 mx :: Int
 mx = 10000
@@ -51,8 +52,8 @@ prop_ValidLocalTime_WhenAfterNow s = do
   mlt `shouldSatisfy` validInterval s . fst
 
 validInterval :: Schedule -> Maybe LocalTime -> Bool
-validInterval (Interval st end) (Just lt) = (lt >= st) && (lt <= end)
-validInterval (Interval st end) Nothing   = st > end
+validInterval (Interval st end _) (Just lt) = (lt >= st) && (lt <= end)
+validInterval (Interval st end _) Nothing   = st > end
 
 prop_validRange v = (v > 0) ==> do
   g <- newStdGen

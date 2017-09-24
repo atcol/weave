@@ -12,6 +12,7 @@ module Lib
     randomSeconds,
     randomTimeBetween,
     result,
+    runTarget,
     startTime,
     scheduled
     ) where
@@ -30,7 +31,7 @@ data Bound = Upper | Lower deriving (Show, Eq, Ord)
 
 -- | The scheduling type, representing when an action should occur, and within which bounds
 data Schedule = -- | Perform something within the start and end times
-                Interval { start :: LocalTime, end :: LocalTime }
+                Interval { start :: LocalTime, end :: LocalTime, tz :: TimeZone}
                 -- | The schedule has passed
                 | Finished
                 deriving (Read, Show, Eq)
@@ -52,13 +53,12 @@ result :: MonadIO m => Target (m a) -> m a
 result (Target _ a) = a
 
 startTime :: Schedule -> Maybe LocalTime
-startTime (Interval s _)    = Just s
+startTime (Interval s _ _)    = Just s
 
 -- | Randomly pick a time compatible with the given start and end times
 genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (Maybe LocalTime, g)
-genTime (Interval s e) rg = do
-  tz <- liftIO $ getCurrentTimeZone
-  if (s < e) then return $ mapRes $ rt tz
+genTime (Interval s e t) rg = do
+  if (s < e) then return $ mapRes $ rt t
              else return (Nothing, rg)
   where rt tz = randomTimeBetween tz s e rg
         mapRes (Just (a, b)) = (Just a, b)
@@ -79,3 +79,9 @@ randomTimeBetween tz s e rg =
              else Just $ first
                     (utcToLocalTime tz . (`addUTCTime` (localTimeToUTC tz s)))
                         (randomSeconds rg (abs $ floor (diff tz s e)))
+
+runTarget :: MonadIO m => Target (m a) -> m a
+runTarget (Target (Interval s e tz) a) = do
+  liftIO $ print "lol"
+  a
+  where delay = diff tz s e

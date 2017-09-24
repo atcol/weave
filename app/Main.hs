@@ -5,15 +5,17 @@
 
 module Main where
 
-import           Data.Time.Clock     (NominalDiffTime, UTCTime, addUTCTime,
-                                      getCurrentTime)
-import           Data.Time.LocalTime (LocalTime, TimeZone, getCurrentTimeZone,
-                                      utcToLocalTime)
+import           Control.Concurrent      (forkIO, takeMVar, threadDelay)
+import           Control.Concurrent.MVar (MVar, newMVar)
+import           Data.Time.Clock         (NominalDiffTime, UTCTime, addUTCTime,
+                                          getCurrentTime)
+import           Data.Time.LocalTime     (LocalTime, TimeZone,
+                                          getCurrentTimeZone, utcToLocalTime)
 import           GHC.Generics
-import           Lib                 as L
+import           Lib                     as L
 import           Options.Generic
 import           System.Process
-import           System.Random       (newStdGen)
+import           System.Random           (newStdGen)
 
 -- | A configuration type
 data Session =
@@ -44,6 +46,7 @@ main = do
     Just sh' -> do print ("Schedule: " ++ show sh')
                    gen <- genTime sh' g
                    print $ "Generated time " ++ (show gen)
+                   runTarget ta
     _        -> print "No schedule computed"
     where printTarget (L.Target sc ioa) = print sc
 
@@ -51,7 +54,7 @@ mkTarget :: Session -> TimeZone -> UTCTime -> (Target (IO ()))
 mkTarget s tz t = L.scheduled (callCommand (cmd s)) $ toSchedule s tz t
 
 toSchedule :: Session -> TimeZone -> UTCTime -> L.Schedule
-toSchedule (Between s e _) tz t = L.Interval (toLocal tz (addUTCTime (nomTime s) t)) (toLocal tz (addUTCTime (nomTime e) t))
+toSchedule (Between s e _) tz t = L.Interval (toLocal tz (addUTCTime (nomTime s) t)) (toLocal tz (addUTCTime (nomTime e) t)) tz
 
 nomTime :: Int -> NominalDiffTime
 nomTime b = realToFrac secs
