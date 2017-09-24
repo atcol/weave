@@ -34,8 +34,7 @@ main = do
   let ta = mkTarget s tz now
       sh = getSchedule ta
   case sh of
-    Just sh' -> do gen <- genTime sh' g
-                   runTarget ta
+    Just sh' -> runTarget ta
     _        -> print "No schedule computed"
     where printTarget (L.Target sc ioa) = print sc
 

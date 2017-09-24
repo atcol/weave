@@ -82,8 +82,11 @@ randomTimeBetween tz s e rg =
                         (randomSeconds rg (abs $ floor (diff tz s e)))
 
 runTarget :: MonadIO m => Target (m a) -> m a
-runTarget (Target (Interval s e tz) a) = do
-  liftIO $ threadDelay delay
-  a
-    where tDiff = (round $ diff tz s e) :: Int
-          delay = abs $ tDiff * 1000 * 1000
+runTarget (Target sc@(Interval s e tz) a) = do
+  g <- liftIO $ newStdGen
+  ranTime <- genTime sc g
+  case ranTime of
+    (Just t, _) -> do let tDiff = (round $ diff tz s t) :: Int
+                          delay = abs $ tDiff * 1000 * 1000
+                      liftIO $ threadDelay delay
+                      a
