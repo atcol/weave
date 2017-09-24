@@ -62,27 +62,23 @@ genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (Either String LocalTi
 genTime (Bounded t b) rg = do
   tz <- liftIO $ getCurrentTimeZone
   now <- liftIO $ getCurrentTime
-  let diff = diffUTCTime now (localTimeToUTC tz t)
+  g <- liftIO $ newStdGen
   case b of
-    Upper -> if beforeNow t tz now then return $ Left "Upper bound time is before now"
-                                   else genTime (Interval (ltNow tz now) t) rg
-    Lower -> genTime (Interval t (ltNow tz now)) rg
+    Upper -> genTime (Interval (ltNow tz   (addUTCTime (- (fst (randomSeconds g 99999)))  now)) t) rg
+    Lower -> genTime (Interval t (ltNow tz ((addUTCTime    (fst (randomSeconds g 99999))) now)))    rg
   where ltNow tz n = utcToLocalTime tz n
 genTime (Interval s e) rg = do
   tz <- liftIO $ getCurrentTimeZone
   now <- liftIO $ getCurrentTime
   if safeTime s e then return $ Right $ rt tz
-                  else return $ Left "Start is < or == to end"
+                  else return $ Left "Start is > end"
   where rt tz = fst $ randomTimeBetween tz s e rg
-
-beforeNow :: LocalTime -> TimeZone -> UTCTime -> Bool
-beforeNow e tz now = e < (utcToLocalTime tz now)
 
 diff :: TimeZone -> LocalTime -> LocalTime -> NominalDiffTime
 diff tz st en = diffUTCTime (localTimeToUTC tz st) (localTimeToUTC tz en)
 
 safeTime :: LocalTime -> LocalTime -> Bool
-safeTime s e = (s < e) && (s /= e)
+safeTime s e = s < e
 
 randomSeconds :: RandomGen g => g -> Int -> (NominalDiffTime, g)
 randomSeconds rg max = first realToFrac $ randomR (0, max) rg

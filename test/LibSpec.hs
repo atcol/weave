@@ -44,10 +44,10 @@ prop_ValidLocalTime_WhenAfterNow s = do
 
 validInterval :: Schedule -> Either String LocalTime -> Bool
 validInterval (Interval st end) (Right lt) = (lt >= st) && (lt <= end)
-validInterval (Interval st end) (Left err)   = err == "Interval end time is before now"
+validInterval (Interval st end) (Left err) = err == "Start is > end"
 validInterval (Bounded t Upper) (Right lt) = lt < t
-validInterval (Bounded t Upper) (Left err) = err == "Upper bound time is before now"
 validInterval (Bounded t Lower) (Right lt) = lt > t
+validInterval _ _                          = False
 
 prop_validRange v = (v > 0) ==> do
   g <- newStdGen
