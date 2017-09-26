@@ -5,6 +5,7 @@ module Data.Time.Schedule.Chaos
     Schedule (..),
     Target (..),
     Bound (..),
+    Frequency (..),
 
     -- | Functions
     genTime,
@@ -41,6 +42,9 @@ data Schedule = -- | Perform something within the start and end times
 data Target m = Target { sched :: Schedule, action :: m }
   deriving (Read, Show, Eq, Functor)
 
+newtype Frequency = Frequency Int
+                  deriving (Read, Show, Eq)
+
 -- | Retrieve the required schedule
 getSchedule :: MonadIO m => Target (m a) -> Maybe Schedule
 getSchedule (Target s _) = Just s
@@ -65,15 +69,19 @@ genTime (Interval s e t) rg = do
         mapRes (Just (a, b)) = (Just a, b)
         mapRes Nothing       = (Nothing, rg)
 
+-- | Provide the difference between two LocalTime instances
 diff :: TimeZone -> LocalTime -> LocalTime -> NominalDiffTime
 diff tz st en = diffUTCTime (localTimeToUTC tz st) (localTimeToUTC tz en)
 
+-- | Is left before right?
 safeTime :: LocalTime -> LocalTime -> Bool
 safeTime s e = s < e
 
+-- | Generate seconds in the interval (0, n)
 randomSeconds :: RandomGen g => g -> Int -> (NominalDiffTime, g)
 randomSeconds rg max = first realToFrac $ randomR (0, max) rg
 
+-- | Generate time within the given Timezone and boundary
 randomTimeBetween :: RandomGen g => TimeZone -> LocalTime -> LocalTime -> g -> Maybe (LocalTime, g)
 randomTimeBetween tz s e rg =
   if (s > e) then Nothing
@@ -81,6 +89,7 @@ randomTimeBetween tz s e rg =
                     (utcToLocalTime tz . (`addUTCTime` (localTimeToUTC tz s)))
                         (randomSeconds rg (abs $ floor (diff tz s e)))
 
+-- | Randomly execute the given target within its schedule boundary
 runTarget :: MonadIO m => Target (m a) -> m a
 runTarget (Target sc@(Interval s e tz) a) = do
   g <- liftIO $ newStdGen
@@ -90,3 +99,5 @@ runTarget (Target sc@(Interval s e tz) a) = do
                           delay = abs $ tDiff * 1000 * 1000
                       liftIO $ threadDelay delay
                       a
+    _ -> error "Invalid schedule"
+
