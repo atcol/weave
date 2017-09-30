@@ -21,7 +21,7 @@ import           System.Random            (newStdGen)
 data Session =
   -- | Execute @cmd@ within the period specified
   Between
-    { startMs :: Maybe Int, endMs :: Int, cmd :: String }
+    { startMs :: Maybe Int, endMs :: Int, cmd :: String, times :: Int, strategy :: Maybe String }
   deriving (Show, Generic)
 
 instance ParseRecord Session
@@ -32,18 +32,15 @@ main = do
   tz <- getCurrentTimeZone
   now <- getCurrentTime
   g <- newStdGen
-  let ta = mkTarget s tz now
-      sh = getSchedule ta
-  case sh of
-    Just sh' -> runTarget ta
-    _        -> print "No schedule computed"
+  nTimes (times s) $ mkTarget s tz now
+  return ()
     where printTarget (C.Target sc ioa) = print sc
 
 mkTarget :: Session -> TimeZone -> UTCTime -> (Target (IO ()))
 mkTarget s tz t = C.scheduled (callCommand (cmd s)) $ toSchedule s tz t
 
 toSchedule :: Session -> TimeZone -> UTCTime -> C.Schedule
-toSchedule (Between s e _) tz t = C.Interval (toLocal tz (addUTCTime (nomTime (fromMaybe 0 s)) t)) (toLocal tz (addUTCTime (nomTime e) t)) tz
+toSchedule (Between s e _ _ _) tz t = C.Interval (toLocal tz (addUTCTime (nomTime (fromMaybe 0 s)) t)) (toLocal tz (addUTCTime (nomTime e) t)) tz
 
 nomTime :: Int -> NominalDiffTime
 nomTime b = realToFrac secs

@@ -1,15 +1,16 @@
 {-# LANGUAGE DeriveFunctor #-}
 module Data.Time.Schedule.Chaos
   (
-    -- | Types
-    Schedule (..),
-    Target (..),
     Bound (..),
     Frequency (..),
+    Schedule (..),
+    Strategy (..),
+    Target (..),
 
     -- | Functions
     genTime,
     getSchedule,
+    nTimes,
     randomSeconds,
     randomTimeBetween,
     result,
@@ -19,6 +20,7 @@ module Data.Time.Schedule.Chaos
     ) where
 
 import           Control.Concurrent     (forkIO, takeMVar, threadDelay)
+import           Control.Monad          (liftM, replicateM, replicateM_)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Data.Bifunctor         (first)
 import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
@@ -26,23 +28,29 @@ import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
 import           Data.Time.LocalTime    (LocalTime, TimeZone,
                                          getCurrentTimeZone, localTimeToUTC,
                                          utcToLocalTime)
-import           System.Random          (Random (..), RandomGen, newStdGen,
-                                         randomR)
-
-data Bound = Upper | Lower deriving (Show, Eq, Ord)
+import           System.Random          (Random (..), RandomGen, StdGen,
+                                         newStdGen, randomR)
 
 -- | The scheduling type, representing when an action should occur, and within which bounds
 data Schedule = -- | Perform something within the start and end times
-                Interval { start :: LocalTime, end :: LocalTime, tz :: TimeZone}
-                -- | The schedule has passed
-                | Finished
-                deriving (Read, Show, Eq)
+              Interval { start :: LocalTime, end :: LocalTime, tz :: TimeZone }
+              -- | The schedule has passed
+              | Finished
+              deriving (Read, Show, Eq)
 
 -- | The target action to be scheduled
 data Target m = Target { sched :: Schedule, action :: m }
   deriving (Read, Show, Eq, Functor)
 
-newtype Frequency = Frequency Int
+data Bound = Upper | Lower deriving (Show, Eq, Read, Ord)
+
+data Strategy = -- | Execute this many times
+                Exactly Int
+                -- | Execute n times in the interval (min, max)
+                | Randomly { min :: Int, max :: Int }
+                deriving (Read, Show, Eq)
+
+data Frequency = Frequency Int
                   deriving (Read, Show, Eq)
 
 -- | Retrieve the required schedule
@@ -90,14 +98,20 @@ randomTimeBetween tz s e rg =
                         (randomSeconds rg (abs $ floor (diff tz s e)))
 
 -- | Randomly execute the given target within its schedule boundary
-runTarget :: MonadIO m => Target (m a) -> m a
-runTarget (Target sc@(Interval s e tz) a) = do
-  g <- liftIO $ newStdGen
+runTarget :: RandomGen g => Target (IO a) -> g -> IO a
+runTarget (Target sc a) g = delayFor sc g >> a
+
+-- | Delay for a random amount within the schedule
+delayFor :: RandomGen g => Schedule -> g -> IO ()
+delayFor sc@(Interval s e tz) g = do
   ranTime <- genTime sc g
   case ranTime of
     (Just t, _) -> do let tDiff = (round $ diff tz s t) :: Int
                           delay = abs $ tDiff * 1000 * 1000
                       liftIO $ threadDelay delay
-                      a
     _ -> error "Invalid schedule"
 
+-- | Run the target computation n times
+nTimes :: MonadIO m => Int -> Target (IO a) -> m [a]
+nTimes n t = liftIO $ replicateM n work
+  where work = newStdGen >>= runTarget t
