@@ -19,9 +19,11 @@ import           System.Random            (newStdGen)
 
 -- | A configuration type
 data Session =
+  -- | Execute @cmd@ randomly between now and now + @m@s, the sionspecified number of times
+  Within { ms :: Int, count :: Maybe Int, cmd :: String }
   -- | Execute @cmd@ within the period specified
-  Between
-    { startMs :: Maybe Int, endMs :: Int, cmd :: String, times :: Int, strategy :: Maybe String }
+  | Between
+    { startMs :: Maybe Int, endMs :: Int, cmd :: String }
   deriving (Show, Generic)
 
 instance ParseRecord Session
@@ -32,15 +34,19 @@ main = do
   tz <- getCurrentTimeZone
   now <- getCurrentTime
   g <- newStdGen
-  nTimes (times s) $ mkTarget s tz now
-  return ()
-    where printTarget (C.Target sc ioa) = print sc
+  l <- run s $ mkTarget s tz now
+  print l
+
+run :: Session -> C.Target (IO a) -> IO [a]
+run (Within _ (Just n) _) t@(C.Target (C.Period _ _) _) = C.times n t
+run _ t@(C.Target (C.Interval _ _ _) _)                 = C.times 1 t
 
 mkTarget :: Session -> TimeZone -> UTCTime -> (Target (IO ()))
 mkTarget s tz t = C.scheduled (callCommand (cmd s)) $ toSchedule s tz t
 
 toSchedule :: Session -> TimeZone -> UTCTime -> C.Schedule
-toSchedule (Between s e _ _ _) tz t = C.Interval (toLocal tz (addUTCTime (nomTime (fromMaybe 0 s)) t)) (toLocal tz (addUTCTime (nomTime e) t)) tz
+toSchedule (Within ms _ _) tz _ = C.Period ms tz
+toSchedule (Between s e _) tz t = C.Interval (toLocal tz (addUTCTime (nomTime (fromMaybe 0 s)) t)) (toLocal tz (addUTCTime (nomTime e) t)) tz
 
 nomTime :: Int -> NominalDiffTime
 nomTime b = realToFrac secs

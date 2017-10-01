@@ -9,13 +9,11 @@ module Data.Time.Schedule.Chaos
 
     -- | Functions
     genTime,
-    getSchedule,
-    nTimes,
+    times,
     randomSeconds,
     randomTimeBetween,
     result,
     runTarget,
-    startTime,
     scheduled
     ) where
 
@@ -32,8 +30,11 @@ import           System.Random          (Random (..), RandomGen, StdGen,
                                          newStdGen, randomR)
 
 -- | The scheduling type, representing when an action should occur, and within which bounds
-data Schedule = -- | Perform something within the start and end times
-              Interval { start :: LocalTime, end :: LocalTime, tz :: TimeZone }
+data Schedule =
+              -- | A section of time from which to pick a random execcution time
+              Period { pMs :: Int, tz :: TimeZone }
+              -- | Perform something within the start and end times
+              | Interval { start :: LocalTime, end :: LocalTime, tz :: TimeZone }
               -- | The schedule has passed
               | Finished
               deriving (Read, Show, Eq)
@@ -46,18 +47,14 @@ data Bound = Upper | Lower deriving (Show, Eq, Read, Ord)
 
 data Strategy = -- | Execute this many times
                 Exactly Int
-                -- | Execute n times in the interval (min, max)
+                -- | Execute n times in the closed interval (min, max)
                 | Randomly { min :: Int, max :: Int }
                 deriving (Read, Show, Eq)
 
 data Frequency = Frequency Int
                   deriving (Read, Show, Eq)
 
--- | Retrieve the required schedule
-getSchedule :: MonadIO m => Target (m a) -> Maybe Schedule
-getSchedule (Target s _) = Just s
-
--- | Construct an schedule with the specified action
+-- | Construct a Target with the specified action
 scheduled :: MonadIO m => m a -> Schedule -> Target (m a)
 scheduled ioa s = Target s ioa
 
@@ -65,11 +62,12 @@ scheduled ioa s = Target s ioa
 result :: MonadIO m => Target (m a) -> m a
 result (Target _ a) = a
 
-startTime :: Schedule -> Maybe LocalTime
-startTime (Interval s _ _)    = Just s
-
 -- | Randomly pick a time compatible with the given start and end times
 genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (Maybe LocalTime, g)
+genTime (Period ms tz) rg = do
+  now <- liftIO $ getCurrentTime
+  let end = addUTCTime (realToFrac (ms `div` 1000)) now
+  genTime (Interval (utcToLocalTime tz now) (utcToLocalTime tz end) tz) rg
 genTime (Interval s e t) rg = do
   if (s < e) then return $ mapRes $ rt t
              else return (Nothing, rg)
@@ -103,15 +101,23 @@ runTarget (Target sc a) g = delayFor sc g >> a
 
 -- | Delay for a random amount within the schedule
 delayFor :: RandomGen g => Schedule -> g -> IO ()
-delayFor sc@(Interval s e tz) g = do
-  ranTime <- genTime sc g
-  case ranTime of
-    (Just t, _) -> do let tDiff = (round $ diff tz s t) :: Int
-                          delay = abs $ tDiff * 1000 * 1000
-                      liftIO $ threadDelay delay
-    _ -> error "Invalid schedule"
+delayFor sc g =
+  genTime sc g
+  >>= return . fst
+  >>= (\t -> case sc of
+               Interval s _ tz -> return $ getDelay tz s t
+               Period ms tz -> do n <- getCurrentTime
+                                  return $ getDelay tz (utcToLocalTime tz n) t)
+  >>= threadDelay
+
+getDelay :: TimeZone -> LocalTime -> Maybe LocalTime -> Int
+getDelay _ s Nothing = error ("Invalid random time for schedule: " ++ show s)
+getDelay tz s (Just t) = delay
+    where tDiff = (round $ diff tz s t) :: Int
+          delay = abs $ tDiff * 1000 * 1000
+
 
 -- | Run the target computation n times
-nTimes :: MonadIO m => Int -> Target (IO a) -> m [a]
-nTimes n t = liftIO $ replicateM n work
+times :: MonadIO m => Int -> Target (IO a) -> m [a]
+times n t = liftIO $ replicateM n work
   where work = newStdGen >>= runTarget t
