@@ -20,7 +20,7 @@ import           System.Random            (newStdGen)
 -- | A configuration type
 data Session =
   -- | Execute @cmd@ randomly between now and now + @m@s, the sionspecified number of times
-  Within { ms :: Int, count :: Maybe Int, cmd :: String }
+  Within { ms :: Int, repeat :: Maybe Int, cmd :: String }
   -- | Execute @cmd@ within the period specified
   | Between
     { startMs :: Maybe Int, endMs :: Int, cmd :: String }
