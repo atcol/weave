@@ -2,19 +2,19 @@
 module Data.Time.Schedule.Chaos
   (
     Bound (..),
-    Frequency (..),
     Schedule (..),
-    Strategy (..),
     Target (..),
 
     -- | Functions
     genTime,
+    genWithin,
     times,
     randomSeconds,
     randomTimeBetween,
     result,
     runTarget,
-    scheduled
+    scheduled,
+    within
     ) where
 
 import           Control.Concurrent     (forkIO, takeMVar, threadDelay)
@@ -45,15 +45,6 @@ data Target m = Target { sched :: Schedule, action :: m }
 
 data Bound = Upper | Lower deriving (Show, Eq, Read, Ord)
 
-data Strategy = -- | Execute this many times
-                Exactly Int
-                -- | Execute n times in the closed interval (min, max)
-                | Randomly { min :: Int, max :: Int }
-                deriving (Read, Show, Eq)
-
-data Frequency = Frequency Int
-                  deriving (Read, Show, Eq)
-
 -- | Construct a Target with the specified action
 scheduled :: MonadIO m => m a -> Schedule -> Target (m a)
 scheduled ioa s = Target s ioa
@@ -62,7 +53,7 @@ scheduled ioa s = Target s ioa
 result :: MonadIO m => Target (m a) -> m a
 result (Target _ a) = a
 
--- | Randomly pick a time compatible with the given start and end times
+-- | Randomly pick a time compatible with the given schedule
 genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (Maybe LocalTime, g)
 genTime (Period ms tz) rg = do
   now <- liftIO $ getCurrentTime
@@ -87,7 +78,7 @@ safeTime s e = s < e
 randomSeconds :: RandomGen g => g -> Int -> (NominalDiffTime, g)
 randomSeconds rg max = first realToFrac $ randomR (0, max) rg
 
--- | Generate time within the given Timezone and boundary
+-- | Generate a time within the given Timezone and times
 randomTimeBetween :: RandomGen g => TimeZone -> LocalTime -> LocalTime -> g -> Maybe (LocalTime, g)
 randomTimeBetween tz s e rg =
   if (s > e) then Nothing
@@ -116,8 +107,15 @@ getDelay tz s (Just t) = delay
     where tDiff = (round $ diff tz s t) :: Int
           delay = abs $ tDiff * 1000 * 1000
 
-
 -- | Run the target computation n times
-times :: MonadIO m => Int -> Target (IO a) -> m [a]
+times :: Int -> Target (IO a) -> IO [a]
 times n t = liftIO $ replicateM n work
   where work = newStdGen >>= runTarget t
+
+-- | Run the target computation any amount of times in the interval @(a, b)@
+within :: (Int, Int) -> Target (IO a) -> IO [a]
+within i t = newStdGen >>= genWithin i t
+
+-- | Run the target computation any amount of times in the interval @(a, b)@, using a supplied RandomGen
+genWithin :: RandomGen g => (Int, Int) -> Target (IO a) -> g -> IO [a]
+genWithin i t g = return (randomR i g) >>= return . fst >>= flip times t
