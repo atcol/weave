@@ -2,14 +2,15 @@
 module Data.Time.Schedule.ChaosSpec ( spec ) where
 
 import           Control.Applicative       ((<$>), (<*>))
+import           Control.Monad.IO.Class    (liftIO)
 import           Data.Time.Clock           (NominalDiffTime, UTCTime,
                                             addUTCTime, getCurrentTime)
 import           Data.Time.LocalTime       (LocalTime, getCurrentTimeZone,
                                             utcToLocalTime)
 import           Data.Time.Schedule.Chaos  (Schedule (..), Target (..), genTime,
                                             randomSeconds, randomTimeBetween,
-                                            within)
-import           Debug.Trace               (traceShow)
+                                            unsafeSchedule, within)
+import           Debug.Trace               (traceM, traceShow)
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.Random             (RandomGen, newStdGen)
 import           Test.Hspec
@@ -52,11 +53,21 @@ spec = do
     context "randomTimeBetween" $
       prop "Produces times in between the given range" $ prop_randomTimeBetween_InRange
 
-    context "within" $
-      prop "Runs number of times within the interval specified" $ prop_within_alwaysInRange
+    context "within" $ do
+      now <- runIO $ getCurrentTime
+      prop "Runs number of times within a *valid* interval" $ prop_within_alwaysInRange now
 
-prop_within_alwaysInRange i@(s, e) t = ((s <= e) && (s >= 0) && (e < 6000)) ==> do
-  traceShow i $ within i (t :: Target (IO String)) `shouldNotReturn` (return "")
+prop_within_alwaysInRange n e t@(Target (Interval st en tz) _) =
+  intervalRestriction n e t  ==> do
+    traceShow n (putStrLn $ show t)
+    within e (t :: Target (IO String)) `shouldNotReturn` (return "")
+prop_within_alwaysInRange n e t =
+  (e >= 0) && (e < 6000) ==> do
+    traceShow n (putStrLn $ show t)
+    within e (t :: Target (IO String)) `shouldNotReturn` (return "")
+
+intervalRestriction n e t@(Target (Interval st en tz) _) =
+  (((utcToLocalTime tz n) <= st) && ((utcToLocalTime tz n) <= en) && (e < 6000))
 
 prop_randomTimeBetween_InRange st en = do
   g <- newStdGen

@@ -14,7 +14,8 @@ module Data.Time.Schedule.Chaos
     result,
     runTarget,
     scheduled,
-    within
+    within,
+    unsafeSchedule
     ) where
 
 import           Control.Concurrent     (forkIO, takeMVar, threadDelay)
@@ -28,6 +29,8 @@ import           Data.Time.LocalTime    (LocalTime, TimeZone,
                                          utcToLocalTime)
 import           System.Random          (Random (..), RandomGen, StdGen,
                                          newStdGen, randomR)
+
+data ScheduleException = InvalidScheduleException deriving (Show, Eq)
 
 -- | The scheduling type, representing when an action should occur, and within which bounds
 data Schedule =
@@ -101,17 +104,26 @@ delayFor sc g =
 getDelay :: TimeZone -> LocalTime -> LocalTime -> Int
 getDelay tz s t = delay
     where tDiff = (round $ diff tz s t) :: Int
-          delay = abs $ tDiff * 1000 * 1000
+          delay = abs $ tDiff * micros
+          micros = 1000 * 1000
 
 -- | Run the target computation n times
 times :: Int -> Target (IO a) -> IO [a]
 times n t = liftIO $ replicateM n work
   where work = newStdGen >>= runTarget t
 
--- | Run the target computation any amount of times in the interval @[a, b]@
-within :: (Int, Int) -> Target (IO a) -> IO [a]
-within i t = newStdGen >>= genWithin i t
+-- | Run the target computation any amount of times in the interval @[0, a]@
+within :: Int -> Target (IO a) -> IO [a]
+within n tar@(Target sch _) = do
+  now <- getCurrentTime >>= return . utcToLocalTime (tz sch)
+  if (invalidSched sch now) then error ("Invalid schedule " ++ show sch)
+                          else newStdGen >>= genWithin n tar
+    where invalidSched (Interval s e t) now = unsafeSchedule s e now
+          invalidSched _ _                  = False
 
--- | Run the target computation any amount of times in the interval @[a, b]@, using a supplied RandomGen
-genWithin :: RandomGen g => (Int, Int) -> Target (IO a) -> g -> IO [a]
-genWithin i t g = return (randomR i g) >>= return . fst >>= flip times t
+unsafeSchedule :: LocalTime -> LocalTime -> LocalTime -> Bool
+unsafeSchedule st et now = (st > et) || (et <= now)
+
+-- | Run the target computation any amount of times in the interval @[0, a]@, using a supplied RandomGen
+genWithin :: RandomGen g => Int -> Target (IO a) -> g -> IO [a]
+genWithin i t g = return (randomR (0, i) g) >>= return . fst >>= flip times t
