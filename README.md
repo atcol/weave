@@ -14,6 +14,18 @@ when integrating with actions using these concepts:
 The intersection of these three concepts is represented in the API "Chaos"
 and the demonstration CLI.
 
+## Examples
+
+### Interval 
+
+Execute an action within `[0, 100]` times with a random delay between "now" and 200ms:
+
+    interval 100 (Target (Period 200) (getCurrentTime >>= print))
+
+or asynchronously:
+
+    asyncInterval 100 (Target (Period 200) (getCurrentTime >>= print))
+
 ## Building
 
 ![Travis CI build status](https://travis-ci.org/atcol/chaos.svg?branch=master)

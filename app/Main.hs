@@ -38,7 +38,7 @@ main = do
 run :: Session -> C.Target (IO a) -> IO [a]
 run (Within _ (Just n) _) t = C.times n t
 run (Within _ Nothing _) t  = C.times 1 t
-run (Randomly _ ma _) t     = C.within ma t
+run (Randomly _ ma _) t     = C.interval ma t
 run _ t                     = C.times 1 t
 
 mkTarget :: Session -> UTCTime -> (Target (IO ()))

@@ -7,7 +7,7 @@ import           Data.Time.Clock           (NominalDiffTime, UTCTime,
                                             addUTCTime, getCurrentTime)
 import           Data.Time.Schedule.Chaos  (Schedule (..), Target (..), genTime,
                                             randomSeconds, randomTimeBetween,
-                                            unsafeSchedule, within, ScheduleException)
+                                            unsafeSchedule, interval, ScheduleException)
 import           Debug.Trace               (traceM, traceShow)
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.Random             (RandomGen, newStdGen)
@@ -45,18 +45,18 @@ spec = do
   describe "randomTimeBetween" $
     prop "Produces times in between the given range" $ prop_randomTimeBetween_InRange
 
-  describe "within" $ do
+  describe "interval" $ do
     now <- runIO $ getCurrentTime
-    prop "Runs number of times within a *valid* interval" $ prop_within_alwaysInRange now
+    prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now
 
-prop_within_alwaysInRange n e t@(Target (Interval st en) _) =
+prop_interval_alwaysInRange n e t@(Target (Interval st en) _) =
   intervalRestriction n e t  ==> do
     traceShow n (putStrLn $ show t)
-    within e (t :: Target (IO String)) `shouldNotReturn` (return [])
-prop_within_alwaysInRange n e t@(Target (Period ms) _) =
+    interval e (t :: Target (IO String)) `shouldNotReturn` (return [])
+prop_interval_alwaysInRange n e t@(Target (Period ms) _) =
   (e >= 0) && (e < 6000) && (ms >= 0) ==> do
     traceShow n (putStrLn $ show t)
-    let val = within e (t :: Target (IO String))
+    let val = interval e (t :: Target (IO String))
     val `shouldNotReturn` (return [])
 
 intervalRestriction n e t@(Target (Interval st en) _) =

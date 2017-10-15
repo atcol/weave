@@ -7,18 +7,20 @@ module Data.Time.Schedule.Chaos
     Target (..),
 
     -- | Functions
+    asyncInterval,
     genTime,
-    genWithin,
+    genInterval,
+    interval,
     times,
     randomSeconds,
     randomTimeBetween,
     result,
     runTarget,
     scheduled,
-    within,
     unsafeSchedule
     ) where
 
+import Control.Concurrent.Async (async, Async (..))
 import           Control.Concurrent     (forkIO, takeMVar, threadDelay)
 import           Control.Monad          (liftM, replicateM, replicateM_)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -39,7 +41,6 @@ data Schedule =
               -- | A section of time from which to pick a random execcution time
               Period { pMs :: Int }
               -- | Perform something within the start and end times
-              -- FIXME restrict this construct  so start is always <= end
               | Interval { start :: UTCTime, end :: UTCTime }
               -- | The schedule has passed
               | Finished
@@ -82,10 +83,6 @@ randomTimeBetween s e rg = case secs of (t, ng) -> (addUTCTime t s, ng)
   --            else throw InvalidScheduleException
   where secs = randomSeconds rg (abs $ floor (diff s e))
 
--- | Randomly execute the given target within its schedule boundary
-runTarget :: RandomGen g => Target (IO a) -> g -> IO a
-runTarget (Target sc a) g = delayFor sc g >> a
-
 -- | Delay for a random amount within the schedule
 delayFor :: RandomGen g => Schedule -> g -> IO ()
 delayFor sc g = genTime sc g
@@ -101,14 +98,14 @@ getDelay s t = delay
         micros = 1000 * 1000
         delay = abs $ tDiff * micros
 
+-- | Randomly execute the given target within its schedule boundary
+runTarget :: RandomGen g => Target (IO a) -> g -> IO a
+runTarget (Target sc a) g = delayFor sc g >> a
+
 -- | Run the target computation n times
 times :: Int -> Target (IO a) -> IO [a]
 times n t = liftIO $ replicateM n work
   where work = newStdGen >>= runTarget t
-
--- | Run the target computation any amount of times in the interval @[1, a]@
-within :: Int -> Target (IO a) -> IO [a]
-within n tar@(Target sch _) = newStdGen >>= genWithin n tar
 
 invalidSched :: Schedule -> UTCTime -> Bool
 invalidSched (Interval s e) now = unsafeSchedule s e now
@@ -117,6 +114,13 @@ invalidSched _ _                = False
 unsafeSchedule :: UTCTime -> UTCTime -> UTCTime -> Bool
 unsafeSchedule st et now = (st > et)
 
+asyncInterval :: Int -> Target (IO a) -> IO [Async a]
+asyncInterval n (Target s a) = interval n (Target s (async a))
+
 -- | Run the target computation any amount of times in the interval @[1, a]@, using a supplied RandomGen
-genWithin :: RandomGen g => Int -> Target (IO a) -> g -> IO [a]
-genWithin i t g = return (randomR (1, i) g) >>= return . fst >>= flip times t
+genInterval :: RandomGen g => Int -> Target (IO a) -> g -> IO [a]
+genInterval i t g = return (randomR (1, i) g) >>= return . fst >>= flip times t
+
+-- | Run the target computation any amount of times in the interval @[1, a]@
+interval :: Int -> Target (IO a) -> IO [a]
+interval n tar = newStdGen >>= genInterval n tar
