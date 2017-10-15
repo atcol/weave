@@ -5,11 +5,9 @@ import           Control.Applicative       ((<$>), (<*>))
 import           Control.Monad.IO.Class    (liftIO)
 import           Data.Time.Clock           (NominalDiffTime, UTCTime,
                                             addUTCTime, getCurrentTime)
-import           Data.Time.LocalTime       (LocalTime, getCurrentTimeZone,
-                                            utcToLocalTime)
 import           Data.Time.Schedule.Chaos  (Schedule (..), Target (..), genTime,
                                             randomSeconds, randomTimeBetween,
-                                            unsafeSchedule, within)
+                                            unsafeSchedule, within, ScheduleException)
 import           Debug.Trace               (traceM, traceShow)
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.Random             (RandomGen, newStdGen)
@@ -22,18 +20,13 @@ import           Test.QuickCheck.Random
 
 instance Arbitrary Schedule where
   arbitrary = oneof [interval, period]
-    where period = Period <$> arbitrary <*> arbitrary
-          interval = do
-                  randSt <- arbitrary
-                  randEnd <- arbitrary
-                  rtz <- arbitrary
-                  return $ Interval randSt randEnd rtz
+    where period = Period <$> arbitrary
+          interval = Interval <$> arbitrary <*> arbitrary
 
 instance Arbitrary (Target (IO String)) where
   arbitrary = do
-    s <- arbitrary :: Gen String
     sc <- arbitrary
-    return $ Target sc (return s)
+    return $ Target sc (return "Test IO action")
 
 instance Show (IO a) where
   show _ = "IO a"
@@ -43,52 +36,54 @@ mx = 10000
 
 spec :: Spec
 spec = do
-  describe "Randomisation & execution" $ do
-    context "randomSeconds" $
-      prop "Always produces times within range" $ prop_validRange
+  describe "randomSeconds" $
+    prop "Always produces times within range" $ prop_validRange
 
-    context "genTime" $
-      prop "Produces times compatible with the given schedule" $ prop_ValidLocalTime_WhenAfterNow
+  describe "genTime" $
+    prop "Produces times compatible with the given schedule" $ prop_ValidTime_WhenAfterNow
 
-    context "randomTimeBetween" $
-      prop "Produces times in between the given range" $ prop_randomTimeBetween_InRange
+  describe "randomTimeBetween" $
+    prop "Produces times in between the given range" $ prop_randomTimeBetween_InRange
 
-    context "within" $ do
-      now <- runIO $ getCurrentTime
-      prop "Runs number of times within a *valid* interval" $ prop_within_alwaysInRange now
+  describe "within" $ do
+    now <- runIO $ getCurrentTime
+    prop "Runs number of times within a *valid* interval" $ prop_within_alwaysInRange now
 
-prop_within_alwaysInRange n e t@(Target (Interval st en tz) _) =
+prop_within_alwaysInRange n e t@(Target (Interval st en) _) =
   intervalRestriction n e t  ==> do
     traceShow n (putStrLn $ show t)
-    within e (t :: Target (IO String)) `shouldNotReturn` (return "")
-prop_within_alwaysInRange n e t =
-  (e >= 0) && (e < 6000) ==> do
+    within e (t :: Target (IO String)) `shouldNotReturn` (return [])
+prop_within_alwaysInRange n e t@(Target (Period ms) _) =
+  (e >= 0) && (e < 6000) && (ms >= 0) ==> do
     traceShow n (putStrLn $ show t)
-    within e (t :: Target (IO String)) `shouldNotReturn` (return "")
+    let val = within e (t :: Target (IO String))
+    val `shouldNotReturn` (return [])
 
-intervalRestriction n e t@(Target (Interval st en tz) _) =
-  (((utcToLocalTime tz n) <= st) && ((utcToLocalTime tz n) <= en) && (e < 6000))
+intervalRestriction n e t@(Target (Interval st en) _) =
+  ((n <= st) && (n <= en) && (e < 6000))
 
 prop_randomTimeBetween_InRange st en = do
   g <- newStdGen
-  tz <- getCurrentTimeZone
-  randomTimeBetween tz st en g `shouldSatisfy` validRandomTime st en
+  randomTimeBetween st en g `shouldSatisfy` validRandomTime st en
 
-validRandomTime :: RandomGen g => LocalTime -> LocalTime -> Maybe (LocalTime, g) -> Bool
-validRandomTime st en (Just (lt, _)) = ((st <= lt) && (lt <= en)) || (st == lt) && (en == lt)
-validRandomTime st en Nothing        = (st > en)
+  --if (st < en) then randomTimeBetween st en g `shouldSatisfy` validRandomTime st en
+               --else randomTimeBetween st en g `shouldThrow` Selector InvalidScheduleException
 
-prop_ValidLocalTime_WhenAfterNow s = do
+validRandomTime :: RandomGen g => UTCTime -> UTCTime -> (UTCTime, g) -> Bool
+validRandomTime st en (nt, _) = if (st <= en) then (nt >= st) && (nt <= en)
+                                              else (nt <= st) || (nt >= en)
+
+prop_ValidTime_WhenAfterNow s = do
   now <- getCurrentTime
   g <- newStdGen
   mlt <- genTime s g
   mlt `shouldSatisfy` validInterval now s . fst
 
-validInterval :: UTCTime -> Schedule -> Maybe LocalTime -> Bool
-validInterval _ (Interval st end _) (Just lt) = (lt >= st) && (lt <= end)
-validInterval _ (Interval st end _) Nothing   = st > end
-validInterval now (Period n tz) (Just lt)     = n <= 0 || lt >= (utcToLocalTime tz now)
-validInterval _ (Period n _) Nothing          = n < 0
+validInterval :: UTCTime -> Schedule -> UTCTime -> Bool
+validInterval _ (Interval st end) nt = if (st < end) then (nt >= st) && (nt <= end)
+                                                     else (nt <= st) || (nt >= end) -- reverse of above
+
+validInterval now (Period n) nt     = n <= 0 || nt >= now
 
 prop_validRange v = (v > 0) ==> do
   g <- newStdGen

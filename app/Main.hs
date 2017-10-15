@@ -9,8 +9,6 @@ import           Control.Concurrent.MVar  (MVar, newMVar)
 import           Data.Maybe               (fromMaybe)
 import           Data.Time.Clock          (NominalDiffTime, UTCTime, addUTCTime,
                                            getCurrentTime)
-import           Data.Time.LocalTime      (LocalTime, TimeZone,
-                                           getCurrentTimeZone, utcToLocalTime)
 import           Data.Time.Schedule.Chaos as C
 import           GHC.Generics
 import           Options.Generic
@@ -32,10 +30,9 @@ instance ParseRecord Session
 main :: IO ()
 main = do
   s <- getRecord "Chaos" :: IO Session
-  tz <- getCurrentTimeZone
   now <- getCurrentTime
   g <- newStdGen
-  l <- run s $ mkTarget s tz now
+  l <- run s $ mkTarget s now
   print l
 
 run :: Session -> C.Target (IO a) -> IO [a]
@@ -44,17 +41,14 @@ run (Within _ Nothing _) t  = C.times 1 t
 run (Randomly _ ma _) t     = C.within ma t
 run _ t                     = C.times 1 t
 
-mkTarget :: Session -> TimeZone -> UTCTime -> (Target (IO ()))
-mkTarget s tz t = C.scheduled (callCommand (cmd s)) $ toSchedule s tz t
+mkTarget :: Session -> UTCTime -> (Target (IO ()))
+mkTarget s t = C.scheduled (callCommand (cmd s)) $ toSchedule s t
 
-toSchedule :: Session -> TimeZone -> UTCTime -> C.Schedule
-toSchedule (Within ms _ _) tz _ = C.Period ms tz
-toSchedule (Randomly ms _ _) tz _ = C.Period ms tz
-toSchedule (Between s e _) tz t = C.Interval (toLocal tz (addUTCTime (nomTime (fromMaybe 0 s)) t)) (toLocal tz (addUTCTime (nomTime e) t)) tz
+toSchedule :: Session -> UTCTime -> C.Schedule
+toSchedule (Within ms _ _) _ = C.Period ms
+toSchedule (Randomly ms _ _) _ = C.Period ms
+toSchedule (Between s e _) t = C.Interval (addUTCTime (nomTime (fromMaybe 0 s)) t) (addUTCTime (nomTime e) t)
 
 nomTime :: Int -> NominalDiffTime
 nomTime b = realToFrac secs
   where secs = b `div` 1000
-
-toLocal :: TimeZone -> UTCTime -> LocalTime
-toLocal tz t = utcToLocalTime tz t
