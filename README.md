@@ -14,6 +14,26 @@ when integrating with actions using these concepts:
 The intersection of these three concepts is represented in the API "Chaos"
 and the demonstration CLI.
 
+## Domain
+
+The types that this API works with is particularly simple. A core design aim
+is to maximise simplicity where possible by avoiding "type ceremony" which
+should enable the user to quickly & concisely describe parameters & the computation
+and the API takes care of the rest.
+
+### Temporal
+
+The `Schedule` type represents the parameters for picking the time of execution
+for an action and it has two value constructors: `Period` and `Interval`. 
+
+`Period` represents an offset from the point of calculation, e.g. +200ms.
+
+`Interval` provides a section of time to randomly pick the point of execution. 
+
+In each case, the general idea is to effectively "describe" the boundaries for
+_when_ to run the computation and the API uses this to randomly pick the execution
+point.
+
 ## Examples
 
 ### Interval 
