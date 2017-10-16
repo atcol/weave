@@ -32,17 +32,15 @@ main = do
   s <- getRecord "Chaos" :: IO Session
   now <- getCurrentTime
   g <- newStdGen
-  l <- run s $ mkTarget s now
+  l <- run s (toSchedule s now) (callCommand (cmd s)) 
   print l
 
-run :: Session -> C.Target (IO a) -> IO [a]
+run :: Session -> Schedule -> (IO a) -> IO [a]
 run (Within _ (Just n) _) t = C.times n t
 run (Within _ Nothing _) t  = C.times 1 t
 run (Randomly _ ma _) t     = C.interval ma t
 run _ t                     = C.times 1 t
 
-mkTarget :: Session -> UTCTime -> (Target (IO ()))
-mkTarget s t = C.scheduled (callCommand (cmd s)) $ toSchedule s t
 
 toSchedule :: Session -> UTCTime -> C.Schedule
 toSchedule (Within ms _ _) _ = C.Period ms
