@@ -5,9 +5,9 @@ import           Control.Applicative       ((<$>), (<*>))
 import           Control.Monad.IO.Class    (liftIO)
 import           Data.Time.Clock           (NominalDiffTime, UTCTime,
                                             addUTCTime, getCurrentTime)
-import           Data.Time.Schedule.Chaos  (Schedule (..), Target (..), genTime,
+import           Data.Time.Schedule.Chaos  (Schedule (..), genTime,
                                             randomSeconds, randomTimeBetween,
-                                            unsafeSchedule, interval, ScheduleException)
+                                            unsafeSchedule, interval)
 import           Debug.Trace               (traceM, traceShow)
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.Random             (RandomGen, newStdGen)
@@ -23,10 +23,8 @@ instance Arbitrary Schedule where
     where period = Period <$> arbitrary
           interval = Interval <$> arbitrary <*> arbitrary
 
-instance Arbitrary (Target (IO String)) where
-  arbitrary = do
-    sc <- arbitrary
-    return $ Target sc (return "Test IO action")
+instance Arbitrary (IO String) where
+  arbitrary = return (return "Test IO action")
 
 instance Show (IO a) where
   show _ = "IO a"
@@ -49,25 +47,22 @@ spec = do
     now <- runIO $ getCurrentTime
     prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now
 
-prop_interval_alwaysInRange n e t@(Target (Interval st en) _) =
-  intervalRestriction n e t  ==> do
-    traceShow n (putStrLn $ show t)
-    interval e (t :: Target (IO String)) `shouldNotReturn` (return [])
-prop_interval_alwaysInRange n e t@(Target (Period ms) _) =
+prop_interval_alwaysInRange n e sc@(Interval st en) ioa =
+  intervalRestriction n e sc  ==> do
+    traceShow n (putStrLn $ show sc)
+    interval e sc (ioa :: IO String) `shouldNotReturn` (return [])
+prop_interval_alwaysInRange n e sc@(Period ms) ioa =
   (e >= 0) && (e < 6000) && (ms >= 0) ==> do
-    traceShow n (putStrLn $ show t)
-    let val = interval e (t :: Target (IO String))
+    traceShow n (putStrLn $ show sc)
+    let val = interval e sc (ioa :: IO String)
     val `shouldNotReturn` (return [])
 
-intervalRestriction n e t@(Target (Interval st en) _) =
+intervalRestriction n e sc@(Interval st en) =
   ((n <= st) && (n <= en) && (e < 6000))
 
 prop_randomTimeBetween_InRange st en = do
   g <- newStdGen
   randomTimeBetween st en g `shouldSatisfy` validRandomTime st en
-
-  --if (st < en) then randomTimeBetween st en g `shouldSatisfy` validRandomTime st en
-               --else randomTimeBetween st en g `shouldThrow` Selector InvalidScheduleException
 
 validRandomTime :: RandomGen g => UTCTime -> UTCTime -> (UTCTime, g) -> Bool
 validRandomTime st en (nt, _) = if (st <= en) then (nt >= st) && (nt <= en)

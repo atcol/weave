@@ -20,11 +20,11 @@ and the demonstration CLI.
 
 Execute an action within `[0, 100]` times with a random delay between "now" and 200ms:
 
-    interval 100 (Target (Period 200) (getCurrentTime >>= print))
+    interval 100 (Period 200) (getCurrentTime >>= print))
 
 or asynchronously:
 
-    asyncInterval 100 (Target (Period 200) (getCurrentTime >>= print))
+    asyncInterval 100 (Period 200) (getCurrentTime >>= print))
 
 ## Building
 

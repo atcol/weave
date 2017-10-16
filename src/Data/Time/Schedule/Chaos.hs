@@ -3,7 +3,6 @@
 module Data.Time.Schedule.Chaos
   (
     Schedule (..),
-    ScheduleException (..),
     Target (..),
 
     -- | Functions
@@ -14,9 +13,7 @@ module Data.Time.Schedule.Chaos
     times,
     randomSeconds,
     randomTimeBetween,
-    result,
     runTarget,
-    scheduled,
     unsafeSchedule
     ) where
 
@@ -29,12 +26,6 @@ import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
                                          diffUTCTime, getCurrentTime)
 import           System.Random          (Random (..), RandomGen, StdGen,
                                          newStdGen, randomR)
-
-import Control.Exception (throw, Exception)
-
-data ScheduleException = InvalidScheduleException deriving (Show, Eq)
-
-instance Exception ScheduleException
 
 -- | The scheduling type, representing when an action should occur, and within which bounds
 data Schedule =
@@ -49,14 +40,6 @@ data Schedule =
 -- | The target action to be scheduled
 data Target m = Target { sched :: Schedule, action :: m }
   deriving (Read, Show, Eq, Functor)
-
--- | Construct a Target with the specified action
-scheduled :: MonadIO m => m a -> Schedule -> Target (m a)
-scheduled ioa s = Target s ioa
-
--- | Pull the result from the target
-result :: MonadIO m => Target (m a) -> m a
-result (Target _ a) = a
 
 -- | Randomly pick a time compatible with the given schedule
 genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (UTCTime, g)
@@ -79,8 +62,6 @@ randomSeconds rg max = first realToFrac $ randomR (0, max) rg
 -- | Generate a time within the given times.
 randomTimeBetween :: RandomGen g => UTCTime -> UTCTime -> g -> (UTCTime, g)
 randomTimeBetween s e rg = case secs of (t, ng) -> (addUTCTime t s, ng)
-  -- if (s < e) then case secs of (t, ng) -> (addUTCTime t s, ng)
-  --            else throw InvalidScheduleException
   where secs = randomSeconds rg (abs $ floor (diff s e))
 
 -- | Delay for a random amount within the schedule
@@ -99,28 +80,29 @@ getDelay s t = delay
         delay = abs $ tDiff * micros
 
 -- | Randomly execute the given target within its schedule boundary
-runTarget :: RandomGen g => Target (IO a) -> g -> IO a
-runTarget (Target sc a) g = delayFor sc g >> a
+runTarget :: RandomGen g => Schedule -> IO a -> g -> IO a
+runTarget sc a g = delayFor sc g >> a
 
 -- | Run the target computation n times
-times :: Int -> Target (IO a) -> IO [a]
-times n t = liftIO $ replicateM n work
-  where work = newStdGen >>= runTarget t
+times :: Int -> Schedule -> IO a -> IO [a]
+times n sch a = liftIO $ replicateM n work
+  where work = newStdGen >>= runTarget sch a
 
 invalidSched :: Schedule -> UTCTime -> Bool
 invalidSched (Interval s e) now = unsafeSchedule s e now
 invalidSched _ _                = False
 
 unsafeSchedule :: UTCTime -> UTCTime -> UTCTime -> Bool
-unsafeSchedule st et now = (st > et)
-
-asyncInterval :: Int -> Target (IO a) -> IO [Async a]
-asyncInterval n (Target s a) = interval n (Target s (async a))
+unsafeSchedule st et now = st > et
 
 -- | Run the target computation any amount of times in the interval @[1, a]@, using a supplied RandomGen
-genInterval :: RandomGen g => Int -> Target (IO a) -> g -> IO [a]
-genInterval i t g = return (randomR (1, i) g) >>= return . fst >>= flip times t
+genInterval :: RandomGen g => Int -> Schedule -> IO a -> g -> IO [a]
+genInterval i s a g = return (randomR (1, i) g) >>= return . fst >>= (\n -> times n s a) -- heh
 
 -- | Run the target computation any amount of times in the interval @[1, a]@
-interval :: Int -> Target (IO a) -> IO [a]
-interval n tar = newStdGen >>= genInterval n tar
+interval :: Int -> Schedule -> IO a -> IO [a]
+interval n s a = newStdGen >>= genInterval n s a
+
+-- | Convenience wrapper for an asynchronous interval invocation
+asyncInterval :: Int -> Schedule -> IO a -> IO [Async a]
+asyncInterval n s a = interval n s (async a)
