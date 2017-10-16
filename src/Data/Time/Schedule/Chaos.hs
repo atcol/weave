@@ -28,7 +28,7 @@ import           System.Random          (Random (..), RandomGen, StdGen,
 
 -- | The scheduling type, representing when an action should occur, and within which bounds
 data Schedule =
-              -- | A section of time from which to pick a random execcution time
+              -- | A offset which to start picking a random execution time
               Period { pMs :: Int }
               -- | Perform something within the start and end times
               | Interval { start :: UTCTime, end :: UTCTime }
@@ -43,8 +43,6 @@ genTime (Period ms) rg = do
   let end = addUTCTime (realToFrac (ms `div` 1000)) now
   genTime (Interval now end) rg
 genTime sc@(Interval s e) rg = return $ randomTimeBetween s e rg
-  --if (invalidSched sc now) then error ("Invalid schedule " ++ show sc)
-                           --else return $ randomTimeBetween s e rg
 
 -- | Shorthand for the difference between two UTCTime instances
 diff :: UTCTime -> UTCTime -> NominalDiffTime
@@ -74,11 +72,11 @@ getDelay s t = delay
         micros = 1000 * 1000
         delay = abs $ tDiff * micros
 
--- | Randomly execute the given target within its schedule boundary
+-- | Randomly execute the given action within its schedule boundary
 runTarget :: RandomGen g => Schedule -> IO a -> g -> IO a
 runTarget sc a g = delayFor sc g >> a
 
--- | Run the target computation n times
+-- | Run the action computation n times
 times :: Int -> Schedule -> IO a -> IO [a]
 times n sch a = liftIO $ replicateM n work
   where work = newStdGen >>= runTarget sch a
@@ -90,11 +88,11 @@ invalidSched _ _                = False
 unsafeSchedule :: UTCTime -> UTCTime -> UTCTime -> Bool
 unsafeSchedule st et now = st > et
 
--- | Run the target computation any amount of times in the interval @[1, a]@, using a supplied RandomGen
+-- | Run the action any amount of times in the interval @[1, a]@, using a supplied RandomGen
 genInterval :: RandomGen g => Int -> Schedule -> IO a -> g -> IO [a]
 genInterval i s a g = return (randomR (1, i) g) >>= return . fst >>= (\n -> times n s a) -- heh
 
--- | Run the target computation any amount of times in the interval @[1, a]@
+-- | Run the action any amount of times in the interval @[1, a]@
 interval :: Int -> Schedule -> IO a -> IO [a]
 interval n s a = newStdGen >>= genInterval n s a
 
