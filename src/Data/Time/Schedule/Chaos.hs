@@ -3,7 +3,6 @@
 module Data.Time.Schedule.Chaos
   (
     Schedule (..),
-    Target (..),
 
     -- | Functions
     asyncInterval,
@@ -36,10 +35,6 @@ data Schedule =
               -- | The schedule has passed
               | Finished
               deriving (Read, Show, Eq)
-
--- | The target action to be scheduled
-data Target m = Target { sched :: Schedule, action :: m }
-  deriving (Read, Show, Eq, Functor)
 
 -- | Randomly pick a time compatible with the given schedule
 genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (UTCTime, g)
