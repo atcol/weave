@@ -16,11 +16,6 @@ and the demonstration CLI.
 
 ## Domain
 
-The types that this API works with is particularly simple. A core design aim
-is to maximise simplicity where possible by avoiding "type ceremony" which
-should enable the user to quickly & concisely describe parameters & the computation
-and the API takes care of the rest.
-
 ### Temporal
 
 The `Schedule` type represents the parameters for picking the time of execution
