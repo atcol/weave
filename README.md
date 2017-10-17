@@ -19,11 +19,11 @@ and the demonstration CLI.
 ### Temporal
 
 The `Schedule` type represents the parameters for picking the time of execution
-for an action and it has two value constructors: `Period` and `Interval`. 
+for an action and it has two value constructors: `Offset` and `Window`. 
 
-`Period` represents an offset from the point of calculation, e.g. +200ms.
+`Offset` represents an offset from the point of calculation, e.g. +200ms.
 
-`Interval` provides a section of time to randomly pick the point of execution. 
+`Window` provides a section of time to randomly pick the point of execution. 
 
 In each case, the general idea is to effectively "describe" the boundaries for
 _when_ to run the computation and the API uses this to randomly pick the execution
@@ -31,15 +31,15 @@ point.
 
 ## Examples
 
-### Interval 
+### Window 
 
 Execute an action within `[0, 100]` times with a random delay between "now" and 200ms:
 
-    interval 100 (Period 200) (getCurrentTime >>= print)
+    timesIn 100 (Offset 200) (getCurrentTime >>= print)
 
 or asynchronously:
 
-    asyncInterval 100 (Period 200) (getCurrentTime >>= print)
+    asyncTimesIn 100 (Offset 200) (getCurrentTime >>= print)
 
 ## Building
 

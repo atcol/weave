@@ -7,7 +7,7 @@ import           Data.Time.Clock           (NominalDiffTime, UTCTime,
                                             addUTCTime, getCurrentTime)
 import           Data.Time.Schedule.Chaos  (Schedule (..), genTime,
                                             randomSeconds, randomTimeBetween,
-                                            unsafeSchedule, interval)
+                                            unsafeSchedule, timesIn)
 import           Debug.Trace               (traceM, traceShow)
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.Random             (RandomGen, newStdGen)
@@ -20,8 +20,8 @@ import           Test.QuickCheck.Random
 
 instance Arbitrary Schedule where
   arbitrary = oneof [interval, period]
-    where period = Period <$> arbitrary
-          interval = Interval <$> arbitrary <*> arbitrary
+    where period = Offset <$> arbitrary
+          interval = Window <$> arbitrary <*> arbitrary
 
 instance Arbitrary (IO String) where
   arbitrary = return (return "Test IO action")
@@ -47,18 +47,17 @@ spec = do
     now <- runIO $ getCurrentTime
     prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now
 
-prop_interval_alwaysInRange n e sc@(Interval st en) ioa =
+prop_interval_alwaysInRange n e sc@(Window st en) ioa =
   intervalRestriction n e sc  ==> do
     traceShow n (putStrLn $ show sc)
-    interval e sc (ioa :: IO String) `shouldNotReturn` (return [])
-prop_interval_alwaysInRange n e sc@(Period ms) ioa =
+    timesIn e sc (ioa :: IO String) `shouldNotReturn` (return [])
+prop_interval_alwaysInRange n e sc@(Offset ms) ioa =
   (e >= 0) && (e < 6000) && (ms >= 0) ==> do
     traceShow n (putStrLn $ show sc)
-    let val = interval e sc (ioa :: IO String)
+    let val = timesIn e sc (ioa :: IO String)
     val `shouldNotReturn` (return [])
 
-intervalRestriction n e sc@(Interval st en) =
-  ((n <= st) && (n <= en) && (e < 6000))
+intervalRestriction n e sc@(Window st en) = ((n <= st) && (n <= en) && (e < 6000))
 
 prop_randomTimeBetween_InRange st en = do
   g <- newStdGen
@@ -72,13 +71,13 @@ prop_ValidTime_WhenAfterNow s = do
   now <- getCurrentTime
   g <- newStdGen
   mlt <- genTime s g
-  mlt `shouldSatisfy` validInterval now s . fst
+  mlt `shouldSatisfy` validSchedule now s . fst
 
-validInterval :: UTCTime -> Schedule -> UTCTime -> Bool
-validInterval _ (Interval st end) nt = if (st < end) then (nt >= st) && (nt <= end)
+validSchedule :: UTCTime -> Schedule -> UTCTime -> Bool
+validSchedule _ (Window st end) nt = if (st < end) then (nt >= st) && (nt <= end)
                                                      else (nt <= st) || (nt >= end) -- reverse of above
 
-validInterval now (Period n) nt     = n <= 0 || nt >= now
+validSchedule now (Offset n) nt     = n <= 0 || nt >= now
 
 prop_validRange v = (v > 0) ==> do
   g <- newStdGen

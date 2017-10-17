@@ -5,10 +5,10 @@ module Data.Time.Schedule.Chaos
     Schedule (..),
 
     -- | Functions
-    asyncInterval,
+    asyncTimesIn,
     genTime,
-    genInterval,
-    interval,
+    genWindow,
+    timesIn,
     times,
     randomSeconds,
     randomTimeBetween,
@@ -29,20 +29,20 @@ import           System.Random          (Random (..), RandomGen, StdGen,
 -- | The scheduling type, representing when an action should occur, and within which bounds
 data Schedule =
               -- | A offset which to start picking a random execution time
-              Period { pMs :: Int }
+              Offset { pMs :: Int }
               -- | Perform something within the start and end times
-              | Interval { start :: UTCTime, end :: UTCTime }
+              | Window { start :: UTCTime, end :: UTCTime }
               -- | The schedule has passed
               | Finished
               deriving (Read, Show, Eq)
 
 -- | Randomly pick a time compatible with the given schedule
 genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (UTCTime, g)
-genTime (Period ms) rg = do
+genTime (Offset ms) rg = do
   now <- liftIO $ getCurrentTime
   let end = addUTCTime (realToFrac (ms `div` 1000)) now
-  genTime (Interval now end) rg
-genTime sc@(Interval s e) rg = return $ randomTimeBetween s e rg
+  genTime (Window now end) rg
+genTime sc@(Window s e) rg = return $ randomTimeBetween s e rg
 
 -- | Shorthand for the difference between two UTCTime instances
 diff :: UTCTime -> UTCTime -> NominalDiffTime
@@ -62,8 +62,8 @@ delayFor :: RandomGen g => Schedule -> g -> IO ()
 delayFor sc g = genTime sc g
   >>= return . fst
   >>= (\ti -> case sc of
-                Interval s _ -> return $ getDelay s ti
-                Period ms    -> getCurrentTime >>= return . flip getDelay ti)
+                Window s _ -> return $ getDelay s ti
+                Offset ms    -> getCurrentTime >>= return . flip getDelay ti)
   >>= threadDelay
 
 getDelay :: UTCTime -> UTCTime -> Int
@@ -82,20 +82,20 @@ times n sch a = liftIO $ replicateM n work
   where work = newStdGen >>= runTarget sch a
 
 invalidSched :: Schedule -> UTCTime -> Bool
-invalidSched (Interval s e) now = unsafeSchedule s e now
+invalidSched (Window s e) now = unsafeSchedule s e now
 invalidSched _ _                = False
 
 unsafeSchedule :: UTCTime -> UTCTime -> UTCTime -> Bool
 unsafeSchedule st et now = st > et
 
 -- | Run the action any amount of times in the interval @[1, a]@, using a supplied RandomGen
-genInterval :: RandomGen g => Int -> Schedule -> IO a -> g -> IO [a]
-genInterval i s a g = return (randomR (1, i) g) >>= return . fst >>= (\n -> times n s a) -- heh
+genWindow :: RandomGen g => Int -> Schedule -> IO a -> g -> IO [a]
+genWindow i s a g = return (randomR (1, i) g) >>= return . fst >>= (\n -> times n s a) -- heh
 
 -- | Run the action any amount of times in the interval @[1, a]@
-interval :: Int -> Schedule -> IO a -> IO [a]
-interval n s a = newStdGen >>= genInterval n s a
+timesIn :: Int -> Schedule -> IO a -> IO [a]
+timesIn n s a = newStdGen >>= genWindow n s a
 
 -- | Convenience wrapper for an asynchronous interval invocation
-asyncInterval :: Int -> Schedule -> IO a -> IO [Async a]
-asyncInterval n s a = interval n s (async a)
+asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
+asyncTimesIn n s a = timesIn n s (async a)
