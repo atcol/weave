@@ -31,7 +31,7 @@ point.
 
 ## Examples
 
-### Window 
+### Offset 
 
 Execute an action within `[0, 100]` times with a random delay between "now" and 200ms:
 
