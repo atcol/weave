@@ -41,6 +41,14 @@ or asynchronously:
 
     asyncTimesIn 100 (Offset 200) (getCurrentTime >>= print)
 
+This can also be demonstrated via the CLI:
+
+  atc@atc-xps:~/src/chaos$ ./chaos between --endMs 200 --cmd "echo lol; date"
+  lol
+  Sat 23 Dec 15:45:41 GMT 2017
+  [()]
+
+
 ## Building
 
 ![Travis CI build status](https://travis-ci.org/atcol/chaos.svg?branch=master)
