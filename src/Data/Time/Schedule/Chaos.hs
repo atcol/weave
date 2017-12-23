@@ -16,15 +16,15 @@ module Data.Time.Schedule.Chaos
     unsafeSchedule
     ) where
 
-import Control.Concurrent.Async (async, Async (..))
-import           Control.Concurrent     (forkIO, takeMVar, threadDelay)
-import           Control.Monad          (liftM, replicateM, replicateM_)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Data.Bifunctor         (first)
-import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
-                                         diffUTCTime, getCurrentTime)
-import           System.Random          (Random (..), RandomGen, StdGen,
-                                         newStdGen, randomR)
+import           Control.Concurrent       (forkIO, takeMVar, threadDelay)
+import           Control.Concurrent.Async (Async (..), async)
+import           Control.Monad            (liftM, replicateM, replicateM_)
+import           Control.Monad.IO.Class   (MonadIO, liftIO)
+import           Data.Bifunctor           (first)
+import           Data.Time.Clock          (NominalDiffTime, UTCTime, addUTCTime,
+                                           diffUTCTime, getCurrentTime)
+import           System.Random            (Random (..), RandomGen, StdGen,
+                                           newStdGen, randomR)
 
 -- | The scheduling type, representing when an action should occur, and within which bounds
 data Schedule =
@@ -35,6 +35,13 @@ data Schedule =
               -- | The schedule has passed
               | Finished
               deriving (Read, Show, Eq)
+
+-- | The environment type, representing an event or source of events for action
+-- | invocation and context
+class Environment a where
+  runNow :: a -> IO b
+
+  runOn :: Schedule -> a -> IO b
 
 -- | Randomly pick a time compatible with the given schedule
 genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (UTCTime, g)
@@ -52,7 +59,7 @@ diff st en = diffUTCTime st en
 randomSeconds :: RandomGen g => g -> Int -> (NominalDiffTime, g)
 randomSeconds rg max = first realToFrac $ randomR (0, max) rg
 
--- | Generate a time within the given times.
+-- | Pick a time within the given boundaries.
 randomTimeBetween :: RandomGen g => UTCTime -> UTCTime -> g -> (UTCTime, g)
 randomTimeBetween s e rg = case secs of (t, ng) -> (addUTCTime t s, ng)
   where secs = randomSeconds rg (abs $ floor (diff s e))
@@ -63,7 +70,7 @@ delayFor sc g = genTime sc g
   >>= return . fst
   >>= (\ti -> case sc of
                 Window s _ -> return $ getDelay s ti
-                Offset ms    -> getCurrentTime >>= return . flip getDelay ti)
+                Offset ms  -> getCurrentTime >>= return . flip getDelay ti)
   >>= threadDelay
 
 getDelay :: UTCTime -> UTCTime -> Int
@@ -76,19 +83,19 @@ getDelay s t = delay
 runTarget :: RandomGen g => Schedule -> IO a -> g -> IO a
 runTarget sc a g = delayFor sc g >> a
 
--- | Run the action computation n times
+-- | Schedule the action @n@ times
 times :: Int -> Schedule -> IO a -> IO [a]
 times n sch a = liftIO $ replicateM n work
   where work = newStdGen >>= runTarget sch a
 
 invalidSched :: Schedule -> UTCTime -> Bool
 invalidSched (Window s e) now = unsafeSchedule s e now
-invalidSched _ _                = False
+invalidSched _ _              = False
 
 unsafeSchedule :: UTCTime -> UTCTime -> UTCTime -> Bool
 unsafeSchedule st et now = st > et
 
--- | Run the action any amount of times in the interval @[1, a]@, using a supplied RandomGen
+-- | Run the action any amount of times in the interval @[1, i]@, using a supplied RandomGen
 genWindow :: RandomGen g => Int -> Schedule -> IO a -> g -> IO [a]
 genWindow i s a g = return (randomR (1, i) g) >>= return . fst >>= (\n -> times n s a) -- heh
 
@@ -96,6 +103,6 @@ genWindow i s a g = return (randomR (1, i) g) >>= return . fst >>= (\n -> times 
 timesIn :: Int -> Schedule -> IO a -> IO [a]
 timesIn n s a = newStdGen >>= genWindow n s a
 
--- | Convenience wrapper for an asynchronous interval invocation
+-- | Asynchronous convenience wrapper for @timesIn@
 asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
 asyncTimesIn n s a = timesIn n s (async a)
