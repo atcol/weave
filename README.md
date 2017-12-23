@@ -43,10 +43,10 @@ or asynchronously:
 
 This can also be demonstrated via the CLI:
 
-  atc@atc-xps:~/src/chaos$ ./chaos between --endMs 200 --cmd "echo lol; date"
-  lol
-  Sat 23 Dec 15:45:41 GMT 2017
-  [()]
+    atc@atc-xps:~/src/chaos$ ./chaos between --endMs 200 --cmd "echo lol; date"
+    lol
+    Sat 23 Dec 15:45:41 GMT 2017
+    [()]
 
 
 ## Building
