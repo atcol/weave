@@ -12,8 +12,7 @@ module Data.Time.Schedule.Chaos
     times,
     randomSeconds,
     randomTimeBetween,
-    runTarget,
-    unsafeSchedule
+    runTarget
     ) where
 
 import           Control.Concurrent       (forkIO, takeMVar, threadDelay)

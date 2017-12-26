@@ -7,7 +7,7 @@ import           Data.Time.Clock           (NominalDiffTime, UTCTime,
                                             addUTCTime, getCurrentTime)
 import           Data.Time.Schedule.Chaos  (Schedule (..), genTime,
                                             randomSeconds, randomTimeBetween,
-                                            unsafeSchedule, timesIn)
+                                            timesIn)
 import           Debug.Trace               (traceM, traceShow)
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.Random             (RandomGen, newStdGen)
