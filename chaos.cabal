@@ -18,6 +18,7 @@ library
   exposed-modules:     Data.Time.Schedule.Chaos
   build-depends:       base >= 4.7 && < 5
                      , async
+                     , mtl
                      , random
                      , time
                      , transformers
@@ -43,6 +44,7 @@ test-suite chaos-test
   build-depends:       base
                      , chaos
                      , hspec
+                     , mtl
                      , QuickCheck
                      , quickcheck-instances
                      , quickcheck-io

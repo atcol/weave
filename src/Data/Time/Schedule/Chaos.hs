@@ -8,6 +8,7 @@ module Data.Time.Schedule.Chaos
     asyncTimesIn,
     genTime,
     genWindow,
+    mkSchedules,
     timesIn,
     times,
     randomSeconds,
@@ -19,28 +20,26 @@ import           Control.Concurrent       (forkIO, takeMVar, threadDelay)
 import           Control.Concurrent.Async (Async (..), async)
 import           Control.Monad            (liftM, replicateM, replicateM_)
 import           Control.Monad.IO.Class   (MonadIO, liftIO)
+import           Control.Monad.Reader     (Reader, runReader)
 import           Data.Bifunctor           (first)
 import           Data.Time.Clock          (NominalDiffTime, UTCTime, addUTCTime,
                                            diffUTCTime, getCurrentTime)
 import           System.Random            (Random (..), RandomGen, StdGen,
                                            newStdGen, randomR)
 
--- | The scheduling type, representing when an action should occur, and within which bounds
+-- | The scheduling type, representing when an action should occur and its bounds
 data Schedule =
               -- | A offset which to start picking a random execution time
               Offset { pMs :: Int }
               -- | Perform something within the start and end times
               | Window { start :: UTCTime, end :: UTCTime }
+              -- | The computation should start immediately
+              | Immediate
               -- | The schedule has passed
               | Finished
               deriving (Read, Show, Eq)
 
--- | The environment type, representing an event or source of events for action
--- | invocation and context
-class Environment a where
-  runNow :: a -> IO b
-
-  runOn :: Schedule -> a -> IO b
+data Environment a = Environment a [Schedule]
 
 -- | Randomly pick a time compatible with the given schedule
 genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (UTCTime, g)
@@ -105,3 +104,7 @@ timesIn n s a = newStdGen >>= genWindow n s a
 -- | Asynchronous convenience wrapper for @timesIn@
 asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
 asyncTimesIn n s a = timesIn n s (async a)
+
+mkSchedules :: Reader e Schedule -> e -> [IO a] -> [(Schedule, IO a)]
+mkSchedules r e acts = map (\ac -> (runReader r e, ac)) acts
+

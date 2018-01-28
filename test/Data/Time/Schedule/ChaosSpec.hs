@@ -3,9 +3,10 @@ module Data.Time.Schedule.ChaosSpec ( spec ) where
 
 import           Control.Applicative       ((<$>), (<*>))
 import           Control.Monad.IO.Class    (liftIO)
+import           Control.Monad.Reader      (Reader)
 import           Data.Time.Clock           (NominalDiffTime, UTCTime,
                                             addUTCTime, getCurrentTime)
-import           Data.Time.Schedule.Chaos  (Schedule (..), genTime,
+import           Data.Time.Schedule.Chaos  (Schedule (..), genTime, mkSchedules,
                                             randomSeconds, randomTimeBetween,
                                             timesIn)
 import           Debug.Trace               (traceM, traceShow)
@@ -47,13 +48,19 @@ spec = do
     now <- runIO $ getCurrentTime
     prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now
 
+  describe "mkSchedules" $ do
+    prop "Benign on empty input" $ prop_mkSchedule_benign_empty_input
+
+prop_mkSchedule_benign_empty_input sc = do
+  length (mkSchedules (return sc) () []) `shouldBe` 0
+
 prop_interval_alwaysInRange n e sc@(Window st en) ioa =
-  intervalRestriction n e sc  ==> do
-    traceShow n (putStrLn $ show sc)
+  intervalRestriction n e sc ==> do
+    --traceShow n (putStrLn $ show sc)
     timesIn e sc (ioa :: IO String) `shouldNotReturn` (return [])
 prop_interval_alwaysInRange n e sc@(Offset ms) ioa =
   (e >= 0) && (e < 6000) && (ms >= 0) ==> do
-    traceShow n (putStrLn $ show sc)
+    --traceShow n (putStrLn $ show sc)
     let val = timesIn e sc (ioa :: IO String)
     val `shouldNotReturn` (return [])
 
