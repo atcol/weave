@@ -107,4 +107,3 @@ asyncTimesIn n s a = timesIn n s (async a)
 
 mkSchedules :: Reader e Schedule -> e -> [IO a] -> [(Schedule, IO a)]
 mkSchedules r e acts = map (\ac -> (runReader r e, ac)) acts
-
