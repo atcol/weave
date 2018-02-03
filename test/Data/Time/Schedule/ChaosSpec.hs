@@ -1,9 +1,10 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Data.Time.Schedule.ChaosSpec ( spec ) where
 
 import           Control.Applicative       ((<$>), (<*>))
 import           Control.Monad.IO.Class    (liftIO)
-import           Control.Monad.Reader      (Reader)
+import           Control.Monad.Reader      (Reader, asks)
 import           Data.Time.Clock           (NominalDiffTime, UTCTime,
                                             addUTCTime, getCurrentTime)
 import           Data.Time.Schedule.Chaos  (Schedule (..), genTime, mkSchedules,
@@ -19,13 +20,18 @@ import           Test.QuickCheck.Instances
 import           Test.QuickCheck.IO        ()
 import           Test.QuickCheck.Random
 
+data ExampleEnv = ExampleEnv { st :: String, int :: Int } deriving Show
+
+instance Arbitrary ExampleEnv where
+  arbitrary = ExampleEnv <$> arbitrary <*> arbitrary
+
 instance Arbitrary Schedule where
   arbitrary = oneof [interval, period]
     where period = Offset <$> arbitrary
           interval = Window <$> arbitrary <*> arbitrary
 
 instance Arbitrary (IO String) where
-  arbitrary = return (return "Test IO action")
+  arbitrary = return (return "Fake IO action")
 
 instance Show (IO a) where
   show _ = "IO a"
@@ -49,7 +55,22 @@ spec = do
     prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now
 
   describe "mkSchedules" $ do
-    prop "Benign on empty input" $ prop_mkSchedule_benign_empty_input
+    prop "Benign on empty input" prop_mkSchedule_benign_empty_input
+
+    prop "Simple reader example" prop_mkSchedule_example
+
+prop_mkSchedule_example :: ExampleEnv -> [IO String] -> Expectation
+prop_mkSchedule_example ex l = do
+  let res = mkSchedules reader ex l
+  actual res `shouldBe` (expected res)
+  where v s n = n * (length s)
+        offset _ = Offset $ v (st ex) (int ex)
+        expected res = map offset res
+        actual res = map fst res
+        reader = do
+                s <- asks st
+                n <- asks int
+                return (Offset $ v s n)
 
 prop_mkSchedule_benign_empty_input sc = do
   length (mkSchedules (return sc) () []) `shouldBe` 0
@@ -82,7 +103,7 @@ prop_ValidTime_WhenAfterNow s = do
 
 validSchedule :: UTCTime -> Schedule -> UTCTime -> Bool
 validSchedule _ (Window st end) nt = if (st < end) then (nt >= st) && (nt <= end)
-                                                     else (nt <= st) || (nt >= end) -- reverse of above
+                                                   else (nt <= st) || (nt >= end) -- reverse of above
 
 validSchedule now (Offset n) nt     = n <= 0 || nt >= now
 

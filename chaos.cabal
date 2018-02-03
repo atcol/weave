@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Data.Time.Schedule.Chaos
+  exposed-modules:     Data.Time.Schedule.Chaos, Data.Time.Schedule.Chaos.Tutorial
   build-depends:       base >= 4.7 && < 5
                      , async
                      , mtl

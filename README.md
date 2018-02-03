@@ -19,7 +19,7 @@ and the demonstration CLI.
 ### Temporal
 
 The `Schedule` type represents the parameters for picking the time of execution
-for an action and it has two value constructors: `Offset` and `Window`. 
+for an action and its two most important value constructors are `Offset` and `Window`. 
 
 `Offset` represents an offset from the point of calculation, e.g. +200ms.
 
@@ -28,6 +28,20 @@ for an action and it has two value constructors: `Offset` and `Window`.
 In each case, the general idea is to effectively "describe" the boundaries for
 _when_ to run the computation and the API uses this to randomly pick the execution
 point.
+
+### Spatial
+
+The `Spatial` type represents the parameters for deciding when to execute an action
+based on non-temporal values e.g. a counter, disk space, a random value. The API
+supports the `Reader` monad from the `mtl` package for this purpose.
+
+`Spatial` values are ultimately used as the input for mapping to `Schedule` (temporal)
+equivalents, as this allows the Chaos API to build a simple parameterised graph 
+of execution flow with "simulated" randomness within API-user specific boundaries.
+
+-- TODO: 
+--    Spatial value constructors
+--    sorting?
 
 ## Examples
 
@@ -47,7 +61,6 @@ This can also be demonstrated via the CLI:
     lol
     Sat 23 Dec 15:45:41 GMT 2017
     [()]
-
 
 ## Building
 
