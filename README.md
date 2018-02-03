@@ -64,7 +64,7 @@ This can also be demonstrated via the CLI:
 
 ## Building
 
-![Travis CI build status](https://travis-ci.org/atcol/chaos.svg?branch=master)
+![Travis CI build status](https://travis-ci.org/squidnyan/chaos.svg?branch=master)
 
 Once you've cloned, just run with `stack`:
 
