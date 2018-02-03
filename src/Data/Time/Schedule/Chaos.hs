@@ -105,5 +105,6 @@ timesIn n s a = newStdGen >>= genWindow n s a
 asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
 asyncTimesIn n s a = timesIn n s (async a)
 
+-- | Construct the schedule using the suppled reader
 mkSchedules :: Reader e Schedule -> e -> [IO a] -> [(Schedule, IO a)]
 mkSchedules r e acts = map (\ac -> (runReader r e, ac)) acts

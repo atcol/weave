@@ -59,20 +59,18 @@ spec = do
 
     prop "Simple reader example" prop_mkSchedule_example
 
-prop_mkSchedule_example :: ExampleEnv -> [IO String] -> Property
-prop_mkSchedule_example ex l =
-  length l > 0 ==> do
-    traceShow ex l
-    res :: [(Schedule, IO String)] <- mkSchedules reader ex l
-    map fst res `shouldBe` expected res
-    where v s n = n * ((length s) - n)
-          offset :: (Schedule, IO a) -> Schedule
-          offset _ = Offset $ v (st ex) (int ex)
-          expected res = map offset res
-          reader = do
-                 s <- asks st
-                 n <- asks int
-                 return (Offset $ v s n)
+prop_mkSchedule_example :: ExampleEnv -> [IO String] -> Expectation
+prop_mkSchedule_example ex l = do
+  let res = mkSchedules reader ex l
+  actual res `shouldBe` (expected res)
+  where v s n = s + n
+        offset _ = Offset $ v (st ex) (int ex)
+        expected res = map offset res
+        actual res = map fst res
+        reader = do
+                s <- asks st
+                n <- asks int
+                return (Offset $ v s n)
 
 prop_mkSchedule_benign_empty_input sc = do
   length (mkSchedules (return sc) () []) `shouldBe` 0
