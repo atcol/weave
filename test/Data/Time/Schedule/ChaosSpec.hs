@@ -63,7 +63,7 @@ prop_mkSchedule_example :: ExampleEnv -> [IO String] -> Expectation
 prop_mkSchedule_example ex l = do
   let res = mkSchedules reader ex l
   actual res `shouldBe` (expected res)
-  where v s n = s + n
+  where v s n = n * (length s)
         offset _ = Offset $ v (st ex) (int ex)
         expected res = map offset res
         actual res = map fst res
