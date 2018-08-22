@@ -4,4 +4,4 @@ local-bin-path: .
 packages:
 - .
 extra-deps: []
-resolver: nightly-2018-02-11
+resolver: nightly-2018-08-21

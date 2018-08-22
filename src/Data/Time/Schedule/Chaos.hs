@@ -33,7 +33,7 @@ import           System.Random            (Random (..), RandomGen, StdGen,
 
 -- | The scheduling type, representing when an action should occur and its bounds
 data Schedule =
-              -- | A offset which to start picking a random execution time
+              -- | An offset to start picking a random execution time
               Offset { pMs :: Int }
               -- | Perform something within the start and end times
               | Window { start :: UTCTime, end :: UTCTime }
@@ -61,7 +61,6 @@ genTime sc@(Window s e) rg = return $ randomTimeBetween s e rg
 diff :: UTCTime -> UTCTime -> NominalDiffTime
 diff st en = diffUTCTime st en
 
-
 -- | Delay for a random amount within the schedule
 delayFor :: RandomGen g => Schedule -> g -> IO g
 delayFor sc g = do
@@ -72,6 +71,7 @@ delayFor sc g = do
     threadDelay del
     return g
 
+-- | Turn the @UTCTime@ to its microseconds
 getDelay :: UTCTime -> UTCTime -> Int
 getDelay s t = delay
   where tDiff = (round $ diff s t) :: Int
