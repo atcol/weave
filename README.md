@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/squidnyan/chaos.svg?branch=master)](https://travis-ci.org/squidnyan/chaos)
+
 # chaos
 
 An API and CLI for (un)predictable scheduling.
