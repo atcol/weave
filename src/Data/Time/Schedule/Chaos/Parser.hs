@@ -18,37 +18,37 @@ data TimeUnit = Seconds | Hours deriving (Eq, Show)
 
 parseTargets :: B.ByteString -> Either B.ByteString [(Schedule, IO ())]
 parseTargets s = do
-  case parseOnly (many1 chaosP) s of
+  case parseOnly chaosP s of
     Left a  -> error a
-    Right s -> Right s -- [(s, print "hihi")]
+    Right s -> Right s
 
-chaosP :: Parser (Schedule, IO ())
+chaosP :: Parser [(Schedule, IO ())]
 chaosP = do
   sch <- scheduleP
   char '{' <?> "Open brace"
   skipSpace
   -- Will this fail on embedded } ?
   cmd <- takeWhile (/= '}') <?> "Command Parser"
-  return (sch, callCommand $ B.unpack cmd)
+  return $ map (\sc -> (sc, callCommand $ B.unpack cmd)) sch
 
-scheduleP :: Parser Schedule
+scheduleP :: Parser [Schedule]
 scheduleP = do
-  fn <- scheduleCtorP <?> "Schedule Parser"
-  num <- digitToInt <$> digit
+  fns <- scheduleCtorP <?> "Schedule Parser"
+  num <- digitToInt <$> digit --FIXME need multi-digits
   skipSpace
   timeUnit <- unitP <?> "Unit Parser"
   skipSpace
   case timeUnit of
-    Seconds -> return $ fn $ num * 1000 -- to milliseconds
-    Hours   -> return $ fn $ num * 1000 * 60 -- to millis, in hours
+    Seconds -> return $ map (\fn -> fn $ num * 1000) fns -- to milliseconds
+    --Hours   -> return $ fn $ num * 1000 * 60 -- to millis, in hours
 
-scheduleCtorP :: Parser (Int -> Schedule)
+scheduleCtorP :: Parser ([Int -> Schedule])
 scheduleCtorP = do
   ctorStr <- (string "every" <|> string "in") <?> "Schedule ctor Parser"
   space
   case ctorStr of
-    "every" -> return Offset
-    "in"    -> return Offset
+    "every" -> return $ repeat Offset
+    "in"    -> return $ repeat Offset
 
 unitP :: Parser TimeUnit
 unitP = do

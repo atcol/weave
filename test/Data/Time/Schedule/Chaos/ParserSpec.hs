@@ -14,6 +14,9 @@ import           Test.Hspec
 instance Show (IO a) where
   show _ = "IO a"
 
+instance Eq (IO a) where
+  (==) _ _ = True
+
 spec :: Spec
 spec = parallel $ do
   describe "ParserSpec" $ do
@@ -22,8 +25,7 @@ spec = parallel $ do
       case parseTargets "every 5 seconds { touch ./lol }" of
         Left e -> error $ "Failed with " ++ show e
         Right r -> do
-          length r `shouldBe` 1
-
+          r `shouldNotBe` []
           case (head r) of
             (Offset 5000, _) -> print "yay"
             a                -> error $ "Incorrect response from parse:" ++ show a
