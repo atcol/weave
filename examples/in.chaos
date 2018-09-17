@@ -1,0 +1,5 @@
+in 2 seconds {
+  date > date.now
+  sleep 2s
+  dat >> date.now
+}

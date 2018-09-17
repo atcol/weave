@@ -1,0 +1,4 @@
+every 5 seconds {
+  echo "Hey!"
+  date
+}

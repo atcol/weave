@@ -48,7 +48,7 @@ scheduleCtorP = do
   space
   case ctorStr of
     "every" -> return $ repeat Offset
-    "in"    -> return $ repeat Offset
+    "in"    -> return [Offset]
 
 unitP :: Parser TimeUnit
 unitP = do
