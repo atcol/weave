@@ -66,6 +66,12 @@ delayFor sc g = do
     threadDelay del
     return g
 
+-- | Delay exactly as the schedule suggests, then run the action
+delayRun :: Schedule -> IO a -> IO a
+delayRun (Offset ms) a = threadDelay (ms * 1000) >> a
+delayRun s _           = error $ "Not yet supported: " ++ show s
+
+
 -- | Turn the @UTCTime@ to its microseconds
 getDelay :: UTCTime -> UTCTime -> Int
 getDelay s t = delay
@@ -104,10 +110,7 @@ runTarget sc a g = delayFor sc g >> a
 
 -- | Run the specified action-schedule pairs
 runSchedules :: [(Schedule, IO a)] -> IO [a]
-runSchedules scs = mapM (\(sc, a) ->
-  do g <- newStdGen
-     delayFor sc g
-     a) scs
+runSchedules scs = mapM (\(sc, a) -> delayRun sc a) scs
 
 -- | Combine the pairs from each list & run them. Uneven lists will yield @[]@
 mergeAndRunSchedules :: [Schedule] -> [IO a] -> IO [a]
