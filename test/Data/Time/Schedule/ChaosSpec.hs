@@ -78,14 +78,14 @@ prop_mkSchedule_benign_empty_input sc = do
 prop_interval_alwaysInRange n e sc@(Window st en) ioa =
   intervalRestriction n e sc ==> do
     --traceShow n (putStrLn $ show sc)
-    timesIn e sc (ioa :: IO String) `shouldNotReturn` (return [])
+    timesIn e sc (ioa :: IO String) `shouldNotReturn` return []
 prop_interval_alwaysInRange n e sc@(Offset ms) ioa =
   (e >= 0) && (e < 6000) && (ms >= 0) ==> do
     --traceShow n (putStrLn $ show sc)
     let val = timesIn e sc (ioa :: IO String)
-    val `shouldNotReturn` (return [])
+    val `shouldNotReturn` return []
 
-intervalRestriction n e sc@(Window st en) = ((n <= st) && (n <= en) && (e < 6000))
+intervalRestriction n e sc@(Window st en) = (n <= st) && (n <= en) && (e < 6000)
 
 prop_randomTimeBetween_InRange st en = do
   g <- newStdGen

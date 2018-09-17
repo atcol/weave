@@ -15,6 +15,7 @@ module Data.Time.Schedule.Chaos
     randomSeconds,
     randomTimeBetween,
     runSchedules,
+    mergeAndRunSchedules,
     runTarget
     ) where
 
@@ -37,13 +38,7 @@ data Schedule =
               Offset { pMs :: Int }
               -- | Perform something within the start and end times
               | Window { start :: UTCTime, end :: UTCTime }
-              -- | The computation should start immediately
-              | Immediate
-              -- | The schedule has passed
-              | Finished
               deriving (Read, Show, Eq)
-
-data Environment a = Environment a [Schedule]
 
 -- | Asynchronous convenience wrapper for @timesIn@
 asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
@@ -90,7 +85,7 @@ invalidSched _ _              = False
 mkOffsets :: Int -> [Schedule]
 mkOffsets n = fmap Offset $ repeat n
 
--- | Construct the schedule using the suppled reader
+-- | Construct the schedule using the supplied reader
 mkSchedules :: Reader e Schedule -> e -> [IO a] -> [(Schedule, IO a)]
 mkSchedules r e acts = map (\ac -> (runReader r e, ac)) acts
 
@@ -107,11 +102,18 @@ randomTimeBetween s e rg = case secs of (t, ng) -> (addUTCTime t s, ng)
 runTarget :: RandomGen g => Schedule -> IO a -> g -> IO a
 runTarget sc a g = delayFor sc g >> a
 
+-- | Run the specified action-schedule pairs
 runSchedules :: [(Schedule, IO a)] -> IO [a]
 runSchedules scs = mapM (\(sc, a) ->
   do g <- newStdGen
      delayFor sc g
      a) scs
+
+-- | Combine the pairs from each list & run them. Uneven lists will yield @[]@
+mergeAndRunSchedules :: [Schedule] -> [IO a] -> IO [a]
+mergeAndRunSchedules x y = runSchedules $ toPairs x y
+  where toPairs (x:xs) (y:ys) = (x, y) : toPairs xs ys
+        toPairs [] []         = []
 
 -- | Schedule the action @n@ times
 times :: Int -> Schedule -> IO a -> IO [a]

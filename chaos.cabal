@@ -15,10 +15,13 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Data.Time.Schedule.Chaos, Data.Time.Schedule.Chaos.Tutorial
+  exposed-modules:     Data.Time.Schedule.Chaos, Data.Time.Schedule.Chaos.Parser, Data.Time.Schedule.Chaos.Tutorial
   build-depends:       base >= 4.7 && < 5
                      , async
+                     , attoparsec
+                     , bytestring
                      , mtl
+                     , process
                      , random
                      , time
                      , transformers
@@ -29,6 +32,7 @@ executable chaos
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
+                     , bytestring
                      , chaos
                      , process
                      , optparse-generic
@@ -40,14 +44,12 @@ test-suite chaos-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
-  other-modules:       Data.Time.Schedule.ChaosSpec, Data.Time.Schedule.ExamplesSpec
+  other-modules:       Data.Time.Schedule.ChaosSpec, Data.Time.Schedule.ExamplesSpec, Data.Time.Schedule.Chaos.ParserSpec
   build-depends:       base
                      , chaos
                      , hspec
                      , http-streams
                      , mtl
-                     , io-streams
-                     , process
                      , QuickCheck
                      , quickcheck-instances
                      , quickcheck-io
