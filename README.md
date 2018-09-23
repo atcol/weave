@@ -64,6 +64,12 @@ This can also be demonstrated via the CLI:
     Sat 23 Dec 15:45:41 GMT 2017
     [()]
 
+There is also file-based support:
+
+    every 6 hours {
+      ssh my-server "apt-get update -y"
+    }
+
 ## Building
 
 ![Travis CI build status](https://travis-ci.org/squidnyan/chaos.svg?branch=master)
