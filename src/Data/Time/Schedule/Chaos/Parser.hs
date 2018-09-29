@@ -34,7 +34,7 @@ chaosP = do
 scheduleP :: Parser [Schedule]
 scheduleP = do
   fns <- scheduleCtorP <?> "Schedule Parser"
-  num <- digitToInt <$> digit --FIXME need multi-digits
+  num <- fmap round double -- digitToInt <$> (many2 digit) --FIXME need multi-digits
   skipSpace
   timeUnit <- unitP <?> "Unit Parser"
   skipSpace
