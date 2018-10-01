@@ -40,7 +40,7 @@ scheduleP = do
   skipSpace
   case timeUnit of
     Seconds -> return $ map (\fn -> fn $ num * 1000) fns -- to milliseconds
-    --Hours   -> return $ fn $ num * 1000 * 60 -- to millis, in hours
+    Hours   -> return $ map (\fn -> fn $ num * 1000 * 60) fns -- to millis, in hours
 
 scheduleCtorP :: Parser ([Int -> Schedule])
 scheduleCtorP = do
