@@ -8,7 +8,6 @@ import           Data.Time.Schedule.Chaos        (Schedule (..),
                                                   mergeAndRunSchedules,
                                                   mkOffsets, runSchedules)
 import           Data.Time.Schedule.Chaos.Parser (parseTargets)
-import qualified Network.Http.Client             as N
 import           Test.Hspec
 
 instance Show (IO a) where
@@ -17,8 +16,7 @@ instance Show (IO a) where
 url = "https://api.coindesk.com/v1/bpi/currentprice/GBP.json"
 
 getBitcoinPrice = do
-  x <- N.get url N.concatHandler
-  return x
+  return 12
 
 spec :: Spec
 spec = parallel $ do

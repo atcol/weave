@@ -1,8 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- | The Chaos parsing API
 module Data.Time.Schedule.Chaos.Parser (
+  TimeUnit (..),
+
   parseTargets,
-  scheduleP
+  scheduleP,
+  toMillis
   ) where
 
 import           Control.Applicative              ((<$>), (<|>))
@@ -14,7 +17,11 @@ import           Prelude                          hiding (takeWhile)
 import           System.Process                   (callCommand)
 
 -- The unit of time for schedule expressions
-data TimeUnit = Seconds | Hours deriving (Eq, Show)
+data TimeUnit = Seconds 
+              | Minutes
+              | Hours 
+              | Days
+              deriving (Enum, Eq, Show)
 
 parseTargets :: B.ByteString -> Either B.ByteString [(Schedule, IO ())]
 parseTargets s = do
@@ -34,13 +41,12 @@ chaosP = do
 scheduleP :: Parser [Schedule]
 scheduleP = do
   fns <- scheduleCtorP <?> "Schedule Parser"
-  num <- fmap round double -- digitToInt <$> (many2 digit) --FIXME need multi-digits
+  num <- fmap round double
   skipSpace
-  timeUnit <- unitP <?> "Unit Parser"
+  tu <- unitP <?> "TimeUnit Parser"
   skipSpace
-  case timeUnit of
-    Seconds -> return $ map (\fn -> fn $ num * 1000) fns -- to milliseconds
-    Hours   -> return $ map (\fn -> fn $ num * 1000 * 60) fns -- to millis, in hours
+  return $ map (\fn -> fn $ num * (toMillis tu)) fns -- to milliseconds
+
 
 scheduleCtorP :: Parser ([Int -> Schedule])
 scheduleCtorP = do
@@ -52,10 +58,21 @@ scheduleCtorP = do
 
 unitP :: Parser TimeUnit
 unitP = do
-  ctorStr <- (string "seconds" <|> string "hours") <?> "Unit ctor Parser"
+  ctorStr <- (string "seconds" 
+              <|> string "minutes"
+              <|> string "hours"
+              <|> string "days") <?> "Unit ctor Parser"
   space
   case ctorStr of
     "seconds" -> return Seconds
+    "minutes" -> return Minutes
     "hours"   -> return Hours
+    "days"    -> return Days
     _         -> error "Unkown schedule token"
 
+-- | Represent our @TimeUnit@ as an @Int@
+toMillis :: TimeUnit -> Int
+toMillis Seconds = 1000
+toMillis Minutes = (toMillis Seconds) * 60
+toMillis Hours = (toMillis Minutes) * 60
+toMillis Days = (toMillis Hours) * 24

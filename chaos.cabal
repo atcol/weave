@@ -46,9 +46,9 @@ test-suite chaos-test
   main-is:             Spec.hs
   other-modules:       Data.Time.Schedule.ChaosSpec, Data.Time.Schedule.ExamplesSpec, Data.Time.Schedule.Chaos.ParserSpec
   build-depends:       base
+                     , bytestring
                      , chaos
                      , hspec
-                     , http-streams
                      , mtl
                      , QuickCheck
                      , quickcheck-instances
