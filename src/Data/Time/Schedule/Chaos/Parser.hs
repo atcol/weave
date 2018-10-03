@@ -47,11 +47,10 @@ scheduleP = do
   skipSpace
   return $ map (\fn -> fn $ num * (toMillis tu)) fns -- to milliseconds
 
-
 scheduleCtorP :: Parser ([Int -> Schedule])
 scheduleCtorP = do
   ctorStr <- (string "every" <|> string "in") <?> "Schedule ctor Parser"
-  space
+  skipSpace
   case ctorStr of
     "every" -> return $ repeat Offset
     "in"    -> return [Offset]
@@ -62,7 +61,7 @@ unitP = do
               <|> string "minutes"
               <|> string "hours"
               <|> string "days") <?> "Unit ctor Parser"
-  space
+  skipSpace
   case ctorStr of
     "seconds" -> return Seconds
     "minutes" -> return Minutes

@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 -- | The core Chaos API
 module Data.Time.Schedule.Chaos
   (
@@ -19,6 +21,7 @@ module Data.Time.Schedule.Chaos
     runTarget
     ) where
 
+import GHC.Generics
 import           Control.Concurrent       (forkIO, takeMVar, threadDelay)
 import           Control.Concurrent.Async (Async (..), async)
 import           Control.Monad            (foldM, liftM, replicateM,
@@ -34,11 +37,11 @@ import           System.Random            (Random (..), RandomGen, StdGen,
 
 -- | The scheduling type, representing when an action should occur and its bounds
 data Schedule =
-              -- | An offset to start picking a random execution time
-              Offset { pMs :: Int }
-              -- | Perform something within the start and end times
-              | Window { start :: UTCTime, end :: UTCTime }
-              deriving (Read, Show, Eq)
+  -- | An point in the future
+  Offset { pMs :: Int }
+  -- | Perform something within the start and end times
+  | Window { start :: UTCTime, end :: UTCTime }
+  deriving (Read, Show, Eq, Generic)
 
 -- | Asynchronous convenience wrapper for @timesIn@
 asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
