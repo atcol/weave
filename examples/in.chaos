@@ -1,5 +1,5 @@
 in 2 seconds {
   date > date.now
-  sleep 2s
+  sleep 2
   date >> date.now
 }
