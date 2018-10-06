@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wall #-}
+
 -- | The Chaos parsing API
 module Data.Time.Schedule.Chaos.Parser (
   TimeUnit (..),
@@ -8,56 +10,53 @@ module Data.Time.Schedule.Chaos.Parser (
   toMillis
   ) where
 
-import           Control.Applicative              ((<$>), (<|>))
+import           Control.Applicative              ((<|>))
 import           Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8            as B
-import           Data.Char                        (digitToInt)
 import           Data.Time.Schedule.Chaos         (Schedule (..))
+import           Debug.Trace                      (trace, traceShow)
 import           Prelude                          hiding (takeWhile)
 import           System.Process                   (callCommand)
 
 -- The unit of time for schedule expressions
-data TimeUnit = Seconds 
+data TimeUnit = Seconds
               | Minutes
-              | Hours 
+              | Hours
               | Days
               deriving (Enum, Eq, Show)
 
-parseTargets :: B.ByteString -> Either B.ByteString [(Schedule, IO ())]
-parseTargets s = do
-  case parseOnly chaosP s of
-    Left a  -> error a
-    Right s -> Right s
+parseTargets :: B.ByteString -> Either String (Schedule, IO ())
+parseTargets = parseOnly chaosP
 
-chaosP :: Parser [(Schedule, IO ())]
+chaosP :: Parser (Schedule, IO ())
 chaosP = do
   sch <- scheduleP
   char '{' <?> "Open brace"
   skipSpace
   -- Will this fail on embedded } ?
   cmd <- takeWhile (/= '}') <?> "Command Parser"
-  return $ map (\sc -> (sc, callCommand $ B.unpack cmd)) sch
+  return (sch, callCommand $ B.unpack cmd)
 
-scheduleP :: Parser [Schedule]
+scheduleP :: Parser Schedule
 scheduleP = do
-  fns <- scheduleCtorP <?> "Schedule Parser"
+  fn <- scheduleCtorP <?> "Schedule Parser"
   num <- fmap round double
   skipSpace
   tu <- unitP <?> "TimeUnit Parser"
   skipSpace
-  return $ map (\fn -> fn $ num * (toMillis tu)) fns -- to milliseconds
+  return $ fn $ num * (toMillis tu)
 
-scheduleCtorP :: Parser ([Int -> Schedule])
+scheduleCtorP :: Parser (Int -> Schedule)
 scheduleCtorP = do
   ctorStr <- (string "every" <|> string "in") <?> "Schedule ctor Parser"
   skipSpace
   case ctorStr of
-    "every" -> return $ repeat Offset
-    "in"    -> return [Offset]
+    "every" -> return Offset
+    "in"    -> return Offset
 
 unitP :: Parser TimeUnit
 unitP = do
-  ctorStr <- (string "seconds" 
+  ctorStr <- (string "seconds"
               <|> string "minutes"
               <|> string "hours"
               <|> string "days") <?> "Unit ctor Parser"
@@ -73,5 +72,5 @@ unitP = do
 toMillis :: TimeUnit -> Int
 toMillis Seconds = 1000
 toMillis Minutes = (toMillis Seconds) * 60
-toMillis Hours = (toMillis Minutes) * 60
-toMillis Days = (toMillis Hours) * 24
+toMillis Hours   = (toMillis Minutes) * 60
+toMillis Days    = (toMillis Hours) * 24
