@@ -31,12 +31,10 @@ parseTargets = parseOnly chaosP
 chaosP :: Parser (Schedule, IO ())
 chaosP = do
   sch <- scheduleP
-  char '{' <?> "Open brace"
-  skipSpace
-  -- Will this fail on embedded } ?
-  cmd <- takeWhile (/= '}') <?> "Command Parser"
+  cmd <- bodyP
   return (sch, callCommand $ B.unpack cmd)
 
+-- | Parse a schedule
 scheduleP :: Parser Schedule
 scheduleP = do
   fn <- scheduleCtorP <?> "Schedule Parser"
@@ -46,6 +44,7 @@ scheduleP = do
   skipSpace
   return $ fn $ num * (toMillis tu)
 
+-- | Parse the schedule string from plain English to its corresponding data constructor
 scheduleCtorP :: Parser (Int -> Schedule)
 scheduleCtorP = do
   ctorStr <- (string "every" <|> string "in") <?> "Schedule ctor Parser"
@@ -54,6 +53,7 @@ scheduleCtorP = do
     "every" -> return Offset
     "in"    -> return Offset
 
+-- | Parse a @TimeUnit@ from plain English
 unitP :: Parser TimeUnit
 unitP = do
   ctorStr <- (string "seconds"
@@ -67,6 +67,14 @@ unitP = do
     "hours"   -> return Hours
     "days"    -> return Days
     _         -> error "Unkown schedule token"
+
+-- | Parse a full command body, e.g. between '{' and '}'
+bodyP :: Parser B.ByteString
+bodyP = do
+  char '{' <?> "Open brace"
+  skipSpace
+  -- Will this fail on embedded } ?
+  takeWhile (/= '}') <?> "Command Parser"
 
 -- | Represent our @TimeUnit@ as an @Int@
 toMillis :: TimeUnit -> Int
