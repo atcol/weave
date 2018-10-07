@@ -41,10 +41,6 @@ supports the `Reader` monad from the `mtl` package for this purpose.
 equivalents, as this allows the Chaos API to build a simple parameterised graph 
 of execution flow with "simulated" randomness within API-user specific boundaries.
 
--- TODO: 
---    Spatial value constructors
---    sorting?
-
 ## Examples
 
 ### Offset 
@@ -71,8 +67,6 @@ There is also file-based support:
     }
 
 ## Building
-
-![Travis CI build status](https://travis-ci.org/squidnyan/chaos.svg?branch=master)
 
 Once you've cloned, just run with `stack`:
 
