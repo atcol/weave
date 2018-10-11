@@ -7,6 +7,6 @@ This tool defines the following grammar with respect to the support for plain-te
     <temporal-spec> ::= "between" <integer> <integer> <time-unit> 
                       | "every" <integer> <time-unit> 
                       | "in" <integer> <time-unit>
-    <time-unit> ::= "SECONDS" | "MINUTES" | "HOURS" | "DAYS"
+    <time-unit> ::= "seconds" | "minutes" | "hours" | "days"
     <opt-body> ::= "{" <string> "}" 
                  | '"' <message> '"'
