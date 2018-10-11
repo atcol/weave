@@ -4,6 +4,9 @@ This tool defines the following grammar with respect to the support for plain-te
     <opt-freq-modifier> ::= "randomly" | "exponentially" | ""
     <cause-spec> ::= <spatial-spec> | <temporal-spec>
     <spatial-spec> ::= "TBD"
-    <temporal-spec> ::= "between" <integer> <integer> <time-unit> | "every" <integer> <time-unit> | "in" <integer> <time-unit>
+    <temporal-spec> ::= "between" <integer> <integer> <time-unit> 
+                      | "every" <integer> <time-unit> 
+                      | "in" <integer> <time-unit>
     <time-unit> ::= "SECONDS" | "MINUTES" | "HOURS" | "DAYS"
-    <opt-body> ::= "{" <string> "}" | '"' <message> '"'
+    <opt-body> ::= "{" <string> "}" 
+                 | '"' <message> '"'
