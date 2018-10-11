@@ -2,7 +2,7 @@
 
 # chaos
 
-An API and CLI for (un)predictable scheduling.
+An API, CLI and DSL for event generation & (un)predictable scheduling.
 
 ## Motivation
 
