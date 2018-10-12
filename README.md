@@ -6,15 +6,14 @@ An API, CLI and DSL for event generation & (un)predictable scheduling.
 
 ## Motivation
 
-Chaos is an experiment to understand the idea of parameterising unpredictability
-when integrating with actions using these concepts:
+Chaos is an experiment exploring the ideas of a rich event generation DSL combined with parameterising unpredictability
+for actions.
+
+The following "core concepts" make up the design & philosophy behind Chaos:
 
  * an action that encapsulates a side-effect
  * temporal and spatial parameters
  * frequency
-
-The intersection of these three concepts is represented in the API "Chaos"
-and the demonstration CLI.
 
 ## Domain
 
@@ -43,7 +42,9 @@ of execution flow with "simulated" randomness within API-user specific boundarie
 
 ## Examples
 
-### Offset 
+There are a number of examples defined in `.chaos` files. See the `examples` folder.
+
+### Offset & randomisation
 
 Execute an action within `[0, 100]` times with a random delay between "now" and 200ms:
 
