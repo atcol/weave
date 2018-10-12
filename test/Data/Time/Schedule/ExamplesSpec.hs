@@ -1,27 +1,32 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wall #-}
+
 module Data.Time.Schedule.ExamplesSpec ( spec ) where
-import           Control.Applicative             ((<$>), (<*>))
-import           Control.Monad.IO.Class          (liftIO)
-import           Data.Time.Clock                 (NominalDiffTime, UTCTime,
-                                                  addUTCTime, getCurrentTime)
-import           Data.Time.Schedule.Chaos        (Schedule (..),
-                                                  mergeAndRunSchedules,
-                                                  mkOffsets, runSchedules)
+import           Control.Monad                   (filterM, mapM)
+import qualified Data.ByteString.Char8           as BS
+import           Data.List
+import           Data.Time.Schedule.Chaos        (Schedule (..))
 import           Data.Time.Schedule.Chaos.Parser (parseTargets)
+import           System.Directory
 import           Test.Hspec
 
-instance Show (IO a) where
-  show _ = "IO a"
-
-url = "https://api.coindesk.com/v1/bpi/currentprice/GBP.json"
-
-getBitcoinPrice = do
-  return 12
+type Target = (Schedule, IO ())
 
 spec :: Spec
-spec = parallel $ do
-  describe "Examples" $ do
-    it "1) query the price of bitcoin every second, 5 times" $ do
-      let offsets = take 5 $ mkOffsets 1000 -- Offsets, every 1 second
-          -- Now we've 5 (Offset 1000, getBitcoinPrice) pairs, ready to run
-      mergeAndRunSchedules offsets (replicate 5 getBitcoinPrice) `shouldNotReturn` []
+spec = do
+  describe "Parser" $ do
+    it "Parses valid examples" $ do
+      exs <- getExamples "./examples/valid"
+      let _ = map (parseTest . parseTargets) exs
+      return ()
+
+getExamples :: FilePath -> IO [BS.ByteString]
+getExamples p = getDirectoryContents p
+  >>= filterM (return . isChaosFile)
+  >>= mapM (BS.readFile . absPath)
+    where isChaosFile = isSuffixOf ".chaos"
+          absPath f = p ++ "/" ++ f
+
+parseTest :: (Either String Target) -> Expectation
+parseTest (Right (s, _)) = s `shouldNotBe` Offset 0
+parseTest (Left l)       = error $ "Parse error: " ++ show l
