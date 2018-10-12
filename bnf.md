@@ -1,4 +1,4 @@
-This tool defines the following grammar with respect to the support for plain-text specification of its rules.
+This tool defines the following grammar with respect to its file-based support.
 
     <chaos-specification> ::= <opt-freq-modifier> <cause-spec> <opt-body>
     <opt-freq-modifier> ::= "randomly" | "exponentially" | ""
@@ -8,5 +8,8 @@ This tool defines the following grammar with respect to the support for plain-te
                       | "every" <integer> <time-unit> 
                       | "in" <integer> <time-unit>
     <time-unit> ::= "seconds" | "minutes" | "hours" | "days"
-    <opt-body> ::= "{" <string> "}" 
-                 | '"' <message> '"'
+    <opt-body> ::= <shell-command>
+                 | <plain-text>
+                 | "@" <url>
+    <shell-command> ::= "{" <string> "}"
+    <plain-text> ::= '"' <string> '"'
