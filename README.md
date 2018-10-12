@@ -9,25 +9,28 @@ An API, CLI and DSL for event generation & (un)predictable scheduling.
 Chaos is an experiment exploring the ideas of a rich event generation DSL combined with parameterising unpredictability
 for actions.
 
-The following "core concepts" make up the design & philosophy behind Chaos:
-
- * an action that encapsulates a side-effect
- * temporal and spatial parameters
- * frequency
-
 ## Domain
+
+There are a number of ideas that are central to the design & philosophy of the API & tooling that Chaos provides. 
+
+| Concept | Description |
+|---------|-------------|
+| Actions | the encapsulation of a side-effect |
+| Temporal | a parameter based on time |
+| Spatial | a parameter based on the environment |
+| Frequency | a multiplier |
+| Integration | drawing from and writing to various toolchains |
 
 ### Temporal
 
-The `Schedule` type represents the parameters for picking the time of execution
-for an action and its two most important value constructors are `Offset` and `Window`. 
+The `Schedule` type represents the parameters time based parameters and its two most important constructors are `Offset` and `Window`. 
 
 `Offset` represents an offset from the point of calculation, e.g. +200ms.
 
-`Window` provides a section of time to randomly pick the point of execution. 
+`Window` represents a section of time.
 
 In each case, the general idea is to effectively "describe" the boundaries for
-_when_ to run the computation and the API uses this to randomly pick the execution
+_when_ to run a computation and the API uses this to (optionally: randomly) pick the execution
 point.
 
 ### Spatial
@@ -44,7 +47,7 @@ of execution flow with "simulated" randomness within API-user specific boundarie
 
 There are a number of examples defined in `.chaos` files. See the `examples` folder.
 
-### Offset & randomisation
+### Offset
 
 Execute an action within `[0, 100]` times with a random delay between "now" and 200ms:
 
