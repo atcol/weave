@@ -23,7 +23,7 @@ There are a number of ideas that are central to the design & philosophy of the A
 
 ### Temporal
 
-The `Schedule` type represents the parameters time based parameters and its two most important constructors are `Offset` and `Window`. 
+The `Schedule` type represents time-based parameters. There are two constructors: `Offset` and `Window`. 
 
 `Offset` represents an offset from the point of calculation, e.g. +200ms.
 
