@@ -9,7 +9,7 @@ This tool defines the following grammar with respect to its file-based support.
                       | "in" <integer> <time-unit>
     <time-unit> ::= "seconds" | "minutes" | "hours" | "days"
     <opt-body> ::= <shell-command>
-                 | <plain-text>
+                 | ":" <plain-text>
                  | "@" <url>
     <shell-command> ::= "{" <string> "}"
     <plain-text> ::= '"' <string> '"'
