@@ -14,7 +14,6 @@ import           Control.Applicative              ((<|>))
 import           Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8            as B
 import           Data.Time.Schedule.Chaos         (Schedule (..))
-import           Debug.Trace                      (trace, traceShow)
 import           Prelude                          hiding (takeWhile)
 import           System.Process                   (callCommand)
 
@@ -31,8 +30,9 @@ parseTargets = parseOnly chaosP
 chaosP :: Parser (Schedule, IO ())
 chaosP = do
   sch <- scheduleP
-  cmd <- bodyP
-  return (sch, callCommand $ B.unpack cmd)
+  bdy <- bodyP
+  return (sch, mkAction bdy)
+    where mkAction b = callCommand $ B.unpack b
 
 -- | Parse a schedule
 scheduleP :: Parser Schedule
@@ -71,10 +71,15 @@ unitP = do
 -- | Parse a full command body, e.g. between '{' and '}'
 bodyP :: Parser B.ByteString
 bodyP = do
-  char '{' <?> "Open brace"
+  op <- (char '{' <?> "Open brace") <|>
+          (char '@' <?> "URL") <|>
+          (char ':' <?> "Plain text")
   skipSpace
   -- Will this fail on embedded } ?
-  takeWhile (/= '}') <?> "Command Parser"
+  takeWhile (/= (inverse op)) <?> "Body contents Parser"
+    where inverse '{' = '}'
+          inverse '@' = '\n'
+          inverse ':' = '\n'
 
 -- | Represent our @TimeUnit@ as an @Int@
 toMillis :: TimeUnit -> Int

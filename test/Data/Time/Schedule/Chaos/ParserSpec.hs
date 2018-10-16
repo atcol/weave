@@ -21,14 +21,22 @@ instance Arbitrary TimeUnit where
 spec :: Spec
 spec =
   describe "ParserSpec" $
-    context "parseTargets - units" $ do
-      prop "QuickCheck - millis & TimeUnit" $
+    context "parseTargets - supports all TimeUnit and arbitrary values" $ do
+      prop "QuickCheck - values & TimeUnit" $
         (\(i :: Int, u :: TimeUnit) -> do
-          let ex = pack $ "every " ++ show i ++ " " ++ lc u ++ " { touch ./lol }"
-          parserTest ex i u
+          let ex1 = pack $ "every " ++ show i ++ " " ++ lc u ++ " { touch ./lol }"
+          parserTest ex1 i u
 
-          let x = pack $ "in " ++ show i ++ " " ++ lc u ++ " { touch ./lol }"
-          parserTest x i u)
+          let ex2 = pack $ "in " ++ show i ++ " " ++ lc u ++ " { touch ./lol }"
+          parserTest ex2 i u)
+
+      prop "QuickCheck - values, TimeUnit and body types" $
+        (\(i :: Int, u :: TimeUnit) -> do
+          let ex1 = pack $ "every " ++ show i ++ " " ++ lc u ++ " @ http://google.com"
+              ex2 = pack $ "in " ++ show i ++ " " ++ lc u ++ " : hello there!"
+          parserTest ex1 i u
+          parserTest ex2 i u)
+
 
 lc :: TimeUnit -> String
 lc = map toLower . show
