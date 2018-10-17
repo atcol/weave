@@ -15,7 +15,7 @@ before_install:
 install:
 - stack --no-terminal --install-ghc install --test --only-dependencies
 script:
-- stack --no-terminal test --haddock --no-haddock-deps
+- stack --no-terminal install --test --haddock --no-haddock-deps
 deploy:
   provider: releases
   api_key:
