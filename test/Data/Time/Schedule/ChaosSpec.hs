@@ -59,6 +59,10 @@ spec = do
 
     prop "Simple reader example" prop_mkSchedule_example
 
+    context "Cause supports Schedule" $ do
+      runIO $ print "lol"
+
+
 prop_mkSchedule_example :: ExampleEnv -> [IO String] -> Expectation
 prop_mkSchedule_example ex l = do
   let res = mkSchedules reader ex l

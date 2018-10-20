@@ -1,10 +1,12 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor         #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE DeriveGeneric #-}
 
 -- | The core Chaos API
 module Data.Time.Schedule.Chaos
   (
+    Frequency (..),
     Schedule (..),
 
     -- | Functions
@@ -25,7 +27,7 @@ module Data.Time.Schedule.Chaos
 
 import           Control.Concurrent       (threadDelay)
 import           Control.Concurrent.Async (Async (..), async)
-import           Control.Monad            (replicateM)
+import           Control.Monad            (liftM, replicateM)
 import           Control.Monad.IO.Class   (MonadIO, liftIO)
 import           Control.Monad.Reader     (Reader, runReader)
 import           Data.Bifunctor           (first)
@@ -43,6 +45,19 @@ data Schedule =
   -- | Perform something within the start and end times
   | Window { start :: UTCTime, end :: UTCTime }
   deriving (Read, Show, Eq, Generic)
+
+-- | Operations covering the source of an event
+class (MonadIO m) => Cause m a where
+  -- | Request the next value, where @a@ is the even source type
+  next :: RandomGen g => a -> m b -> g -> Maybe b
+
+-- | Operations pertaining to the rate of an event occurring
+class (MonadIO m, Cause m a) => Frequency m a where
+  -- | Given the
+  hasMore :: a -> m Bool
+
+instance Cause IO Schedule where
+  next s ac g = runTarget s ac g >>= liftM
 
 -- | Asynchronous convenience wrapper for @timesIn@
 asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
