@@ -47,4 +47,3 @@ runTest p f = do
   length exs `shouldNotBe` 0
   mapM_ (print . (++) "Example: " . show) exs
   forM_ exs (f . parseTargets)
-  --length (map (f . parseTargets) exs) `shouldNotBe` 0
