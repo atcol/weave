@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Data.Time.Schedule.ExamplesSpec ( spec ) where
-import           Control.Monad                   (filterM, mapM)
+import           Control.Monad                   (filterM, forM_, mapM, mapM_)
 import qualified Data.ByteString.Char8           as BS
 import           Data.List
 import           Data.Time.Schedule.Chaos        (Schedule (..))
@@ -14,13 +14,17 @@ type Target = (Schedule, IO ())
 
 type ValidationFunction = (Either String Target) -> Expectation
 
+instance Show (IO a) where
+  show a = "IO a"
+
 spec :: Spec
 spec = do
   describe "Parser" $ do
     it "Supports valid examples" $
       runTest "./examples/valid" validParseTest
-    it "Rejects invalid examples" $
-      runTest "examples/invalid" invalidParseTest
+    it "Rejects invalid examples" $ do
+      v <- runTest "examples/invalid" invalidParseTest
+      return v
 
 getExamples :: FilePath -> IO [BS.ByteString]
 getExamples p = getDirectoryContents p
@@ -35,11 +39,12 @@ validParseTest (Left l)       = error $ "Parse error: " ++ show l
 
 invalidParseTest :: (Either String Target) -> Expectation
 invalidParseTest (Right (s, _)) = error $ "Failure expected: " ++ show s
-invalidParseTest (Left l)       = l `shouldSatisfy` isInfixOf "askjdasdh"
+invalidParseTest (Left l)       = l `shouldSatisfy` isInfixOf "Parse error"
 
 runTest :: FilePath -> ValidationFunction -> Expectation
 runTest p f = do
   exs <- getExamples p
-  exs `shouldNotBe` []
-  let _ = map (f . parseTargets) exs
-  return ()
+  length exs `shouldNotBe` 0
+  mapM_ (print . (++) "Example: " . show) exs
+  forM_ exs (f . parseTargets)
+  --length (map (f . parseTargets) exs) `shouldNotBe` 0

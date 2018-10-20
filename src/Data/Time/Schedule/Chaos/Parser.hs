@@ -25,7 +25,9 @@ data TimeUnit = Seconds
               deriving (Enum, Eq, Show)
 
 parseTargets :: B.ByteString -> Either String (Schedule, IO ())
-parseTargets = parseOnly chaosP
+parseTargets = wrap . parseOnly chaosP
+  where wrap (Left e) = Left $ "Parse error: " ++ show e -- For testing
+        wrap r        = r
 
 chaosP :: Parser (Schedule, IO ())
 chaosP = do
