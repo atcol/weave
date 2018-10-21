@@ -48,7 +48,7 @@ data Schedule =
 -- | Operations covering the source of an event
 class (MonadIO m) => Cause m a where
   -- | Request the next value, where @a@ is the even source type
-  next :: RandomGen g => a -> m b -> g -> m b
+  next :: a -> m b -> m b
 
 -- | Operations pertaining to the rate of an event occurring
 class (MonadIO m, Cause m a) => Frequency m a where
@@ -56,7 +56,7 @@ class (MonadIO m, Cause m a) => Frequency m a where
   hasMore :: a -> m Bool
 
 instance Cause IO Schedule where
-  next s ac g = runTarget s ac g
+  next s ac = newStdGen >>= runTarget s ac
 
 -- | Asynchronous convenience wrapper for @timesIn@
 asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
