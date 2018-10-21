@@ -21,8 +21,7 @@ module Data.Time.Schedule.Chaos
     randomTimeBetween,
     runSchedule,
     runSchedules,
-    mergeAndRunSchedules,
-    runTarget
+    mergeAndRunSchedules
     ) where
 
 import           Control.Concurrent       (threadDelay)
@@ -49,7 +48,7 @@ data Schedule =
 -- | Operations covering the source of an event
 class (MonadIO m) => Cause m a where
   -- | Request the next value, where @a@ is the even source type
-  next :: RandomGen g => a -> m b -> g -> Maybe b
+  next :: RandomGen g => a -> m b -> g -> m b
 
 -- | Operations pertaining to the rate of an event occurring
 class (MonadIO m, Cause m a) => Frequency m a where
@@ -57,7 +56,7 @@ class (MonadIO m, Cause m a) => Frequency m a where
   hasMore :: a -> m Bool
 
 instance Cause IO Schedule where
-  next s ac g = runTarget s ac g >>= liftM
+  next s ac g = runTarget s ac g
 
 -- | Asynchronous convenience wrapper for @timesIn@
 asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
@@ -120,8 +119,8 @@ randomTimeBetween s e rg = case secs of (t, ng) -> (addUTCTime t s, ng)
   where secs = randomSeconds rg (abs $ floor (diff s e))
 
 -- | Randomly execute the given action within its schedule boundary
-runTarget :: RandomGen g => Schedule -> IO a -> g -> IO a
-runTarget sc a g = delayFor sc g >> a
+runTarget :: (RandomGen g, MonadIO m) => Schedule -> IO a -> g -> m a
+runTarget sc a g = liftIO $ delayFor sc g >> a
 
 runSchedule :: (Schedule, IO a) -> IO a
 runSchedule (sc, a) = delayRun sc a
