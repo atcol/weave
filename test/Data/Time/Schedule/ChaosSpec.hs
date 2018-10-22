@@ -5,11 +5,11 @@ module Data.Time.Schedule.ChaosSpec ( spec ) where
 import           Control.Applicative       ((<$>), (<*>))
 import           Control.Monad.IO.Class    (liftIO)
 import           Control.Monad.Reader      (Reader, asks)
-import           Data.Time.Clock           (NominalDiffTime, UTCTime,
-                                            addUTCTime, getCurrentTime)
-import           Data.Time.Schedule.Chaos  (Schedule (..), genTime, mkSchedules,
-                                            randomSeconds, randomTimeBetween,
-                                            timesIn)
+import           Data.Time.Clock           (NominalDiffTime, UTCTime (..),
+                                            diffUTCTime, getCurrentTime)
+import           Data.Time.Schedule.Chaos  (Cause (..), Schedule (..), genTime,
+                                            mkSchedules, randomSeconds,
+                                            randomTimeBetween, timesIn)
 import           Debug.Trace               (traceM, traceShow)
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.Random             (RandomGen, newStdGen)
@@ -39,28 +39,37 @@ instance Show (IO a) where
 mx :: Int
 mx = 10000
 
+action :: IO String
+action = print "Hi!" >> return "Hello"
+
 spec :: Spec
 spec = do
-  describe "randomSeconds" $
-    prop "Always produces times within range" $ prop_validRange
+  describe "Chaos API" $ do
+    context "Demonstrate" $ do
+      it "`Cause` and `Schedule`" $ do
+        tBefore <- getCurrentTime
+        next (Offset 1000) action `shouldReturn` "Hello"
+        tAfter <- getCurrentTime
+        diffUTCTime tAfter tBefore `shouldSatisfy` (\d -> round d `elem` [1, 2])
 
-  describe "genTime" $
-    prop "Produces times compatible with the given schedule" $ prop_ValidTime_WhenAfterNow
+  describe "Chaos Functions" $ do
+    context "randomSeconds" $
+      prop "Always produces times within range" $ prop_validRange
 
-  describe "randomTimeBetween" $
-    prop "Produces times in between the given range" $ prop_randomTimeBetween_InRange
+    context "genTime" $
+      prop "Produces times compatible with the given schedule" $ prop_ValidTime_WhenAfterNow
 
-  describe "interval" $ do
-    now <- runIO $ getCurrentTime
-    prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now
+    context "randomTimeBetween" $
+      prop "Produces times in between the given range" $ prop_randomTimeBetween_InRange
 
-  describe "mkSchedules" $ do
-    prop "Benign on empty input" prop_mkSchedule_benign_empty_input
+    context "interval" $ do
+      now <- runIO $ getCurrentTime
+      prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now
 
-    prop "Simple reader example" prop_mkSchedule_example
+    context "mkSchedules" $ do
+      prop "Benign on empty input" prop_mkSchedule_benign_empty_input
 
-    context "Cause supports Schedule" $ do
-      runIO $ print "lol"
+      prop "Simple reader example" prop_mkSchedule_example
 
 
 prop_mkSchedule_example :: ExampleEnv -> [IO String] -> Expectation

@@ -6,7 +6,11 @@
 -- | The core Chaos API
 module Data.Time.Schedule.Chaos
   (
+    -- | Typeclasses
     Frequency (..),
+    Cause (..),
+
+    -- | Data constructors
     Schedule (..),
 
     -- | Functions
@@ -37,17 +41,18 @@ import           GHC.Generics
 import           System.Random            (Random (..), RandomGen, newStdGen,
                                            randomR)
 
--- | The scheduling type, representing when an action should occur and its bounds
+-- | An event source descriptor based on time
 data Schedule =
   -- | An point in the future
-  Offset { pMs :: Int }
+  Offset Int
   -- | Perform something within the start and end times
-  | Window { start :: UTCTime, end :: UTCTime }
+  | Window UTCTime UTCTime
   deriving (Read, Show, Eq, Generic)
 
--- | Operations covering the source of an event
+-- | Operations for sourcing events
 class (MonadIO m) => Cause m a where
-  -- | Request the next value, where @a@ is the even source type
+  -- | Request the next event, where @a@ is the even source descriptor,
+  -- and @m b@ is the event generation action
   next :: a -> m b -> m b
 
 -- | Operations pertaining to the rate of an event occurring
@@ -56,7 +61,7 @@ class (MonadIO m, Cause m a) => Frequency m a where
   hasMore :: a -> m Bool
 
 instance Cause IO Schedule where
-  next s ac = newStdGen >>= runTarget s ac
+  next = delayRun
 
 -- | Asynchronous convenience wrapper for @timesIn@
 asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
@@ -88,7 +93,6 @@ delayFor sc g = do
 delayRun :: Schedule -> IO a -> IO a
 delayRun (Offset ms) a = threadDelay (ms * 1000) >> a
 delayRun s _           = error $ "Not yet supported: " ++ show s
-
 
 -- | Turn the @UTCTime@ to its microseconds
 getDelay :: UTCTime -> UTCTime -> Int
