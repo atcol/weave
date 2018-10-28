@@ -9,7 +9,7 @@ import           Data.Time.Clock           (NominalDiffTime, UTCTime (..),
                                             diffUTCTime, getCurrentTime)
 import           Data.Time.Schedule.Chaos  (Cause (..), Schedule (..), genTime,
                                             mkSchedules, randomSeconds,
-                                            randomTimeBetween, timesIn)
+                                            randomTimeBetween)
 import           Debug.Trace               (traceM, traceShow)
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.Random             (RandomGen, newStdGen)
@@ -46,13 +46,23 @@ spec :: Spec
 spec = do
   describe "Chaos API" $ do
     context "Demonstrate" $ do
-      it "`Cause` and `Schedule`" $ do
+      it "`Cause` and `Schedule` - single" $ do
         tBefore <- getCurrentTime
+
+        -- | Generate the next event, after a 1 second delay
         next (Offset 1000) action `shouldReturn` "Hello"
         tAfter <- getCurrentTime
-        diffUTCTime tAfter tBefore `shouldSatisfy` (\d -> round d `elem` [1, 2])
+        diffUTCTime tAfter tBefore `shouldSatisfy` ((==) 1 . round)
 
-  describe "Chaos Functions" $ do
+      it "`Cause` and `Schedule` - times" $ do
+        tBefore <- getCurrentTime
+
+        -- | Generate 10 events, each with a 100 ms delay
+        times 10 (Offset 100) action `shouldReturn` (replicate 10 "Hello")
+        tAfter <- getCurrentTime
+        diffUTCTime tAfter tBefore `shouldSatisfy` ((==) 1 . round)
+
+  describe "Chaos 'Helper' Functions" $ do
     context "randomSeconds" $
       prop "Always produces times within range" $ prop_validRange
 
@@ -90,12 +100,10 @@ prop_mkSchedule_benign_empty_input sc = do
 
 prop_interval_alwaysInRange n e sc@(Window st en) ioa =
   intervalRestriction n e sc ==> do
-    --traceShow n (putStrLn $ show sc)
-    timesIn e sc (ioa :: IO String) `shouldNotReturn` return []
+    times e sc (ioa :: IO String) `shouldNotReturn` return []
 prop_interval_alwaysInRange n e sc@(Offset ms) ioa =
   (e >= 0) && (e < 6000) && (ms >= 0) ==> do
-    --traceShow n (putStrLn $ show sc)
-    let val = timesIn e sc (ioa :: IO String)
+    let val = times e sc (ioa :: IO String)
     val `shouldNotReturn` return []
 
 intervalRestriction n e sc@(Window st en) = (n <= st) && (n <= en) && (e < 6000)
