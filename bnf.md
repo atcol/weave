@@ -4,8 +4,8 @@ This tool defines the following grammar with respect to its file-based support.
     <freq-modifier> ::= "randomly" | "exponentially" | "every" | "in"
     <cause-spec> ::= <spatial-spec> | <temporal-spec>
     <spatial-spec> ::= "TBD"
-    <temporal-spec> ::= "between" <integer> <integer> <time-unit>
-                      | "offset" <integer> <time-unit>
+    <temporal-spec> ::= <integer> <integer> <time-unit>
+                      | <integer> <time-unit>
     <time-unit> ::= "seconds" | "minutes" | "hours" | "days"
     <opt-body> ::= <shell-command>
                  | ":" <plain-text>
