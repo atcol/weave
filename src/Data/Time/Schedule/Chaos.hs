@@ -70,8 +70,12 @@ class (MonadIO m) => Cause m s where
   upper :: s -> m b -> m b
 
 instance Cause IO Int where
+  next = lower
+
   -- | A delay of @ms@ milliseconds before executing @a@
-  next ms a  = threadDelay (ms * 1000) >> a
+  lower ms a = threadDelay (ms * 1000) >> a
+
+  --upper ms a = newStdGen >>= genTime (Offset ms) >>=
 
 instance Cause IO UTCTime where
   -- | A delay of @t - getCurrentTime@  before executing @a@
@@ -83,7 +87,10 @@ instance Cause IO UTCTime where
 instance Cause IO Schedule where
 
   next (Offset ms) a  = next ms a
-  --next (Window s e) a = newStdGen >>= return . randomTimeBetween s e
+  next (Window s e) a = newStdGen >>=
+    return . randomTimeBetween s e >>=
+    return . fst >>=
+    (\t -> next t a)
 
 -- | Asynchronous convenience wrapper for @timesIn@
 --asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
