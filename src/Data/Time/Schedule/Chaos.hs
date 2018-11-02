@@ -106,7 +106,7 @@ genTime (Window s e) rg = return $ randomTimeBetween s e rg
 
 -- | Shorthand for the difference between two UTCTime instances
 diff :: UTCTime -> UTCTime -> NominalDiffTime
-diff st en = diffUTCTime st en
+diff = diffUTCTime
 
 -- | Delay for a random amount within the schedule
 delayFor :: RandomGen g => Schedule -> g -> IO g
