@@ -11,8 +11,11 @@ module Data.Time.Schedule.Chaos.Parser (
   ) where
 
 import           Control.Applicative              ((<|>))
+import           Control.Monad.IO.Class           (liftIO)
 import           Data.Attoparsec.ByteString.Char8
+import           Data.Bifunctor                   (first)
 import qualified Data.ByteString.Char8            as B
+import           Data.Char                        (toUpper)
 import           Data.Time.Schedule.Chaos         (Schedule (..))
 import           Prelude                          hiding (takeWhile)
 import           System.Process                   (callCommand)
@@ -31,10 +34,19 @@ parseTargets = wrap . parseOnly chaosP
 
 chaosP :: Parser (Schedule, IO ())
 chaosP = do
+  bdys <- many' declaredBodyP
   sch <- scheduleP
-  bdy <- bodyP
-  return (sch, mkAction bdy)
-    where mkAction b = callCommand $ B.unpack b
+  ac <- mapBody bdys
+  return (sch, ac)
+    where mapBody [] = parseBdy
+          mapBody l = do
+            ref <- bodyRefP l
+            case ref of
+              Nothing  -> error "No action found by identifier"
+              Just act -> return act
+          parseBdy = do
+            bdy <- bodyP
+            return $ mkAction bdy
 
 -- | Parse a schedule
 scheduleP :: Parser Schedule
@@ -49,7 +61,8 @@ scheduleP = do
 -- | Parse the schedule string from plain English to its corresponding data constructor
 scheduleCtorP :: Parser (Int -> Schedule)
 scheduleCtorP = do
-  ctorStr <- (string "every" <|> string "in") <?> "Schedule ctor Parser"
+  skipWhile ((==) '\n')
+  ctorStr <- ((string "every" <?> "every") <|> (string "in" <?> "in")) <?> "Schedule ctor Parser"
   skipSpace
   case ctorStr of
     "every" -> return Offset
@@ -70,6 +83,16 @@ unitP = do
     "days"    -> return Days
     _         -> error "Unkown schedule token"
 
+
+-- | Parse an action with its identifier
+declaredBodyP :: Parser (B.ByteString, B.ByteString)
+declaredBodyP = do
+  string "action" <?> "Declared Action"
+  skipSpace
+  name <- many1 letter_ascii
+  bdy <- bodyP
+  return (B.pack name, bdy)
+
 -- | Parse a full command body, e.g. between '{' and '}'
 bodyP :: Parser B.ByteString
 bodyP = do
@@ -83,9 +106,25 @@ bodyP = do
           inverse '@' = '\n'
           inverse ':' = '\n'
 
+-- | Parse the body reference (e.g. " -> name") to an action
+-- after looking up the identifier in the given list
+bodyRefP :: [(B.ByteString, B.ByteString)] -> Parser (Maybe (IO ()))
+bodyRefP [] = return Nothing
+bodyRefP l = do
+  skipSpace
+  string "->"
+  skipSpace
+  iden <- many1 letter_ascii
+  toAction $ filter ((==) iden . B.unpack) $ map fst l
+    where toAction []    = return Nothing
+          toAction (a:_) = return $ Just $ mkAction a
+
 -- | Represent our @TimeUnit@ as an @Int@
 toMillis :: TimeUnit -> Int
 toMillis Seconds = 1000
 toMillis Minutes = (toMillis Seconds) * 60
 toMillis Hours   = (toMillis Minutes) * 60
 toMillis Days    = (toMillis Hours) * 24
+
+mkAction :: B.ByteString -> IO ()
+mkAction  = callCommand . B.unpack

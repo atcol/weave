@@ -42,4 +42,6 @@ runTest :: FilePath -> ValidationFunction -> Expectation
 runTest p f = do
   exs <- getExamples p
   length exs `shouldNotBe` 0
-  forM_ exs (f . parseTargets)
+  forM_ exs (\ex -> do
+    print $ "Testing: " ++ show ex
+    f $ parseTargets ex)
