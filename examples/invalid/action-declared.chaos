@@ -1,0 +1,7 @@
+action date {
+  date > date.now
+  sleep 2
+  date >> date.now
+}
+
+in 2 seconds NonExistentAction
