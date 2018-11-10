@@ -11,12 +11,11 @@ module Data.Time.Schedule.Chaos.Parser (
   ) where
 
 import           Control.Applicative              ((<|>))
-import           Control.Monad.IO.Class           (liftIO)
 import           Data.Attoparsec.ByteString.Char8
-import           Data.Bifunctor                   (first)
 import qualified Data.ByteString.Char8            as B
-import           Data.Char                        (toUpper)
+import           Data.Maybe                       (catMaybes)
 import           Data.Time.Schedule.Chaos         (Schedule (..))
+import           Debug.Trace                      (traceM)
 import           Prelude                          hiding (takeWhile)
 import           System.Process                   (callCommand)
 
@@ -34,19 +33,17 @@ parseTargets = wrap . parseOnly chaosP
 
 chaosP :: Parser (Schedule, IO ())
 chaosP = do
-  bdys <- many' declaredBodyP
-  sch <- scheduleP
-  ac <- mapBody bdys
-  return (sch, ac)
-    where mapBody [] = parseBdy
-          mapBody l = do
-            ref <- bodyRefP l
-            case ref of
-              Nothing  -> error "No action found by identifier"
-              Just act -> return act
-          parseBdy = do
-            bdy <- bodyP
-            return $ mkAction bdy
+  bdys <- many' (declaredBodyP <|> (bodyP >>= (\a -> return ("inline", a))))
+  case bdys of
+    [] -> do
+      s <- scheduleP
+      b <- bodyP
+      return (s, mkAction b)
+    l -> do
+      s <- scheduleP
+      refs <- bodyRefP l `sepBy` (char ',')
+      let resolvedActions = catMaybes refs
+      return (s, sequence_ $ catMaybes refs)
 
 -- | Parse a schedule
 scheduleP :: Parser Schedule
@@ -83,13 +80,13 @@ unitP = do
     "days"    -> return Days
     _         -> error "Unkown schedule token"
 
-
 -- | Parse an action with its identifier
 declaredBodyP :: Parser (B.ByteString, B.ByteString)
 declaredBodyP = do
-  string "action" <?> "Declared Action"
+  act <- string "action" <?> "Declared Action"
   skipSpace
   name <- many1 letter_ascii
+  skipSpace
   bdy <- bodyP
   return (B.pack name, bdy)
 
@@ -101,18 +98,18 @@ bodyP = do
           (char ':' <?> "Plain text")
   skipSpace
   -- Will this fail on embedded } ?
-  takeWhile (/= (inverse op)) <?> "Body contents Parser"
+  res <- takeWhile (/= (inverse op)) <?> "Body contents Parser"
+  skipMany (char $ inverse op)
+  return res
     where inverse '{' = '}'
           inverse '@' = '\n'
           inverse ':' = '\n'
 
--- | Parse the body reference (e.g. " -> name") to an action
+-- | Parse the body reference (e.g. "action1, action2") to an action
 -- after looking up the identifier in the given list
 bodyRefP :: [(B.ByteString, B.ByteString)] -> Parser (Maybe (IO ()))
 bodyRefP [] = return Nothing
 bodyRefP l = do
-  skipSpace
-  string "->"
   skipSpace
   iden <- many1 letter_ascii
   toAction $ filter ((==) iden . B.unpack) $ map fst l
