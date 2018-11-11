@@ -4,7 +4,6 @@
 
 module Data.Time.Schedule.Chaos.ParserSpec ( spec ) where
 
-import           Control.Monad                   (forM_)
 import qualified Data.ByteString                 as B
 import           Data.ByteString.Char8           (pack)
 import           Data.Char                       (toLower)
@@ -36,7 +35,6 @@ spec =
               ex2 = pack $ "in " ++ show i ++ " " ++ lc u ++ " : hello there!"
           parserTest ex1 i u
           parserTest ex2 i u)
-
 
 lc :: TimeUnit -> String
 lc = map toLower . show

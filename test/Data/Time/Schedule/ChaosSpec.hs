@@ -5,11 +5,11 @@ module Data.Time.Schedule.ChaosSpec ( spec ) where
 import           Control.Applicative       ((<$>), (<*>))
 import           Control.Monad.IO.Class    (liftIO)
 import           Control.Monad.Reader      (Reader, asks)
-import           Data.Time.Clock           (NominalDiffTime, UTCTime,
-                                            addUTCTime, getCurrentTime)
-import           Data.Time.Schedule.Chaos  (Schedule (..), genTime, mkSchedules,
-                                            randomSeconds, randomTimeBetween,
-                                            timesIn)
+import           Data.Time.Clock           (NominalDiffTime, UTCTime (..),
+                                            diffUTCTime, getCurrentTime)
+import           Data.Time.Schedule.Chaos  (Cause (..), Schedule (..), genTime,
+                                            mkSchedules, randomSeconds,
+                                            randomTimeBetween)
 import           Debug.Trace               (traceM, traceShow)
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.Random             (RandomGen, newStdGen)
@@ -39,25 +39,48 @@ instance Show (IO a) where
 mx :: Int
 mx = 10000
 
+action :: IO String
+action = print "Hi!" >> return "Hello"
+
 spec :: Spec
 spec = do
-  describe "randomSeconds" $
-    prop "Always produces times within range" $ prop_validRange
+  describe "Chaos API" $ do
+    context "Demonstrate" $ do
+      it "`Cause` and `Schedule` - single" $ do
+        tBefore <- getCurrentTime
 
-  describe "genTime" $
-    prop "Produces times compatible with the given schedule" $ prop_ValidTime_WhenAfterNow
+        -- | Generate the next event, after a 1 second delay
+        next (Offset 1000) action `shouldReturn` "Hello"
+        tAfter <- getCurrentTime
+        diffUTCTime tAfter tBefore `shouldSatisfy` ((==) 1 . round)
 
-  describe "randomTimeBetween" $
-    prop "Produces times in between the given range" $ prop_randomTimeBetween_InRange
+      it "`Cause` and `Schedule` - times" $ do
+        tBefore <- getCurrentTime
 
-  describe "interval" $ do
-    now <- runIO $ getCurrentTime
-    prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now
+        -- | Generate 10 events, each with a 100 ms delay
+        times 10 (Offset 100) action `shouldReturn` (replicate 10 "Hello")
+        tAfter <- getCurrentTime
+        diffUTCTime tAfter tBefore `shouldSatisfy` ((==) 1 . round)
 
-  describe "mkSchedules" $ do
-    prop "Benign on empty input" prop_mkSchedule_benign_empty_input
+  describe "Chaos 'Helper' Functions" $ do
+    context "randomSeconds" $
+      prop "Always produces times within range" $ prop_validRange
 
-    prop "Simple reader example" prop_mkSchedule_example
+    context "genTime" $
+      prop "Produces times compatible with the given schedule" $ prop_ValidTime_WhenAfterNow
+
+    context "randomTimeBetween" $
+      prop "Produces times in between the given range" $ prop_randomTimeBetween_InRange
+
+    context "interval" $ do
+      now <- runIO $ getCurrentTime
+      prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now
+
+    context "mkSchedules" $ do
+      prop "Benign on empty input" prop_mkSchedule_benign_empty_input
+
+      prop "Simple reader example" prop_mkSchedule_example
+
 
 prop_mkSchedule_example :: ExampleEnv -> [IO String] -> Expectation
 prop_mkSchedule_example ex l = do
@@ -77,12 +100,10 @@ prop_mkSchedule_benign_empty_input sc = do
 
 prop_interval_alwaysInRange n e sc@(Window st en) ioa =
   intervalRestriction n e sc ==> do
-    --traceShow n (putStrLn $ show sc)
-    timesIn e sc (ioa :: IO String) `shouldNotReturn` return []
+    times e sc (ioa :: IO String) `shouldNotReturn` return []
 prop_interval_alwaysInRange n e sc@(Offset ms) ioa =
   (e >= 0) && (e < 6000) && (ms >= 0) ==> do
-    --traceShow n (putStrLn $ show sc)
-    let val = timesIn e sc (ioa :: IO String)
+    let val = times e sc (ioa :: IO String)
     val `shouldNotReturn` return []
 
 intervalRestriction n e sc@(Window st en) = (n <= st) && (n <= en) && (e < 6000)

@@ -44,13 +44,13 @@ handleParse = either error C.runSchedule
 run :: Session -> Schedule -> (IO a) -> IO [a]
 run (Within _ (Just n) _) t = C.times n t
 run (Within _ Nothing _) t  = C.times 1 t
-run (Randomly _ ma _) t     = C.timesIn ma t
+run (Randomly _ ma _) t     = C.times ma t
 run _ t                     = C.times 1 t
 
 toSchedule :: Session -> UTCTime -> C.Schedule
-toSchedule (Within ms _ _) _ = C.Offset ms
+toSchedule (Within ms _ _) _   = C.Offset ms
 toSchedule (Randomly ms _ _) _ = C.Offset ms
-toSchedule (Between s e _) t = C.Window (addUTCTime (nomTime (fromMaybe 0 s)) t) (addUTCTime (nomTime e) t)
+toSchedule (Between s e _) t   = undefined -- C.Window (addUTCTime (nomTime (fromMaybe 0 s)) t) (addUTCTime (nomTime e) t)
 
 nomTime :: Int -> NominalDiffTime
 nomTime b = realToFrac secs

@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 module Data.Time.Schedule.ExamplesSpec ( spec ) where
-import           Control.Monad                   (filterM, forM_, mapM, mapM_)
+import           Control.Monad                   (filterM, forM_, mapM)
 import qualified Data.ByteString.Char8           as BS
 import           Data.List
 import           Data.Time.Schedule.Chaos        (Schedule (..))
@@ -14,17 +14,13 @@ type Target = (Schedule, IO ())
 
 type ValidationFunction = (Either String Target) -> Expectation
 
-instance Show (IO a) where
-  show a = "IO a"
-
 spec :: Spec
 spec = do
   describe "Parser" $ do
     it "Supports valid examples" $
       runTest "./examples/valid" validParseTest
     it "Rejects invalid examples" $ do
-      v <- runTest "examples/invalid" invalidParseTest
-      return v
+      runTest "examples/invalid" invalidParseTest
 
 getExamples :: FilePath -> IO [BS.ByteString]
 getExamples p = getDirectoryContents p
@@ -45,5 +41,6 @@ runTest :: FilePath -> ValidationFunction -> Expectation
 runTest p f = do
   exs <- getExamples p
   length exs `shouldNotBe` 0
-  mapM_ (print . (++) "Example: " . show) exs
-  forM_ exs (f . parseTargets)
+  forM_ exs (\ex -> do
+    print $ "Testing: " ++ show ex
+    f $ parseTargets ex)
