@@ -20,8 +20,7 @@ spec = do
     it "Supports valid examples" $
       runTest "./examples/valid" validParseTest
     it "Rejects invalid examples" $ do
-      v <- runTest "examples/invalid" invalidParseTest
-      return v
+      runTest "examples/invalid" invalidParseTest
 
 getExamples :: FilePath -> IO [BS.ByteString]
 getExamples p = getDirectoryContents p

@@ -15,7 +15,6 @@ import           Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8            as B
 import           Data.Maybe                       (catMaybes)
 import           Data.Time.Schedule.Chaos         (Schedule (..))
-import           Debug.Trace                      (traceM)
 import           Prelude                          hiding (takeWhile)
 import           System.Process                   (callCommand)
 
@@ -34,16 +33,18 @@ parseTargets = wrap . parseOnly chaosP
 chaosP :: Parser (Schedule, IO ())
 chaosP = do
   bdys <- many' (declaredBodyP <|> (bodyP >>= (\a -> return ("inline", a))))
-  case bdys of
-    [] -> do
-      s <- scheduleP
-      b <- bodyP
-      return (s, mkAction b)
-    l -> do
-      s <- scheduleP
-      refs <- bodyRefP l `sepBy` (char ',')
-      let resolvedActions = catMaybes refs
-      return (s, sequence_ $ catMaybes refs)
+  mapBdys bdys
+    where mapBdys [] = do -- parse the body inline
+            s <- scheduleP
+            b <- bodyP
+            return (s, mkAction b)
+          mapBdys l = do
+            s <- scheduleP
+            refs <- bodyRefP l `sepBy` (char ',')
+            let resolvedActions = catMaybes refs
+            case resolvedActions of
+              [] -> fail "Parse error: No actions found by references"
+              _  -> return (s, sequence_ $ map snd resolvedActions)
 
 -- | Parse a schedule
 scheduleP :: Parser Schedule
@@ -78,12 +79,12 @@ unitP = do
     "minutes" -> return Minutes
     "hours"   -> return Hours
     "days"    -> return Days
-    _         -> error "Unkown schedule token"
+    _         -> fail "Unkown schedule token"
 
 -- | Parse an action with its identifier
 declaredBodyP :: Parser (B.ByteString, B.ByteString)
 declaredBodyP = do
-  act <- string "action" <?> "Declared Action"
+  _ <- string "action" <?> "Declared Action"
   skipSpace
   name <- many1 letter_ascii
   skipSpace
@@ -107,14 +108,14 @@ bodyP = do
 
 -- | Parse the body reference (e.g. "action1, action2") to an action
 -- after looking up the identifier in the given list
-bodyRefP :: [(B.ByteString, B.ByteString)] -> Parser (Maybe (IO ()))
+bodyRefP :: [(B.ByteString, B.ByteString)] -> Parser (Maybe (String, IO ()))
 bodyRefP [] = return Nothing
 bodyRefP l = do
   skipSpace
   iden <- many1 letter_ascii
-  toAction $ filter ((==) iden . B.unpack) $ map fst l
-    where toAction []    = return Nothing
-          toAction (a:_) = return $ Just $ mkAction a
+  toAction iden $ filter ((==) iden . B.unpack) $ map fst l
+    where toAction _ []    = return Nothing
+          toAction i (a:_) = return $ Just (i, mkAction a)
 
 -- | Represent our @TimeUnit@ as an @Int@
 toMillis :: TimeUnit -> Int
