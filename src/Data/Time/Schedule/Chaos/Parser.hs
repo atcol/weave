@@ -32,8 +32,7 @@ parseTargets = wrap . parseOnly chaosP
 
 chaosP :: Parser (Schedule, IO ())
 chaosP = do
-  bdys <- many' (declaredBodyP <|> (bodyP >>= (\a -> return ("inline", a))))
-  mapBdys bdys
+  many' (declaredBodyP <|> (bodyP >>= (\a -> return ("inline", a)))) >>= mapBdys
     where mapBdys [] = do -- parse the body inline
             s <- scheduleP
             b <- bodyP
@@ -89,6 +88,7 @@ declaredBodyP = do
   name <- many1 letter_ascii
   skipSpace
   bdy <- bodyP
+  skipWhile ((==) '\n')
   return (B.pack name, bdy)
 
 -- | Parse a full command body, e.g. between '{' and '}'
