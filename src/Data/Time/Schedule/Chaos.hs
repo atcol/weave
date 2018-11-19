@@ -142,8 +142,8 @@ randomTimeBetween s e rg = case secs of (t, ng) -> (addUTCTime t s, ng)
   where secs = randomSeconds rg (abs $ floor (diff s e))
 
 -- | Randomly execute the given action within its schedule boundary
-runTarget :: (RandomGen g, MonadIO m) => Schedule -> IO a -> g -> m a
-runTarget sc a g = liftIO $ delayFor sc g >> a
+runPlan :: (RandomGen g, MonadIO m) => Schedule -> IO a -> g -> m a
+runPlan sc a g = liftIO $ delayFor sc g >> a
 
 runSchedule :: (Schedule, IO a) -> IO a
 runSchedule (sc, a) = next sc a

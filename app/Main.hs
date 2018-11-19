@@ -36,8 +36,8 @@ main = do
   now <- getCurrentTime
   g <- newStdGen
   case s of
-    From f -> B.readFile f >>= return . CP.parseTargets >>= handleParse >>= print . show
-    _      -> run s (toSchedule s now) (callCommand (cmd s)) >>= print . show
+    From f -> B.readFile f >>= return . CP.parseTargets >>= handleParse
+    _      -> run s (toSchedule s now) (callCommand (cmd s)) >> return ()
 
 handleParse = either error C.runSchedule
 
