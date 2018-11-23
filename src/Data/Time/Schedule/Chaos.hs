@@ -10,6 +10,8 @@ module Data.Time.Schedule.Chaos
     Cause (..),
 
     -- | Data constructors
+    Frequency (..),
+    Plan (..),
     Schedule (..),
 
     -- | Functions
@@ -19,12 +21,11 @@ module Data.Time.Schedule.Chaos
     randomSeconds,
     randomTimeBetween,
     runSchedule,
-    mergeAndRunSchedules
     ) where
 
 import           Control.Concurrent       (threadDelay)
 import           Control.Concurrent.Async (Async (..), async)
-import           Control.Monad            (replicateM)
+import           Control.Monad            (forever, replicateM)
 import           Control.Monad.IO.Class   (MonadIO, liftIO)
 import           Control.Monad.Reader     (Reader, runReader)
 import           Data.Bifunctor           (first)
@@ -35,6 +36,9 @@ import           GHC.Generics
 import           System.Random            (Random (..), RandomGen, newStdGen,
                                            randomR)
 
+-- | An execution plan
+data Plan a = Plan Frequency Schedule (IO a)
+
 -- | An event source descriptor based on time
 data Schedule =
   -- | A point in the future, in ms
@@ -44,6 +48,9 @@ data Schedule =
   -- | A point between a lower & upper time boundary
   | Window UTCTime UTCTime
   deriving (Read, Show, Eq, Generic)
+
+-- | The amount of times of some "thing", e.g. action, schedule
+data Frequency = Once | Continuous | N Int deriving (Eq, Show)
 
 -- | Operations for sourcing events
 class (MonadIO m) => Cause m s where
@@ -141,20 +148,7 @@ randomTimeBetween :: RandomGen g => UTCTime -> UTCTime -> g -> (UTCTime, g)
 randomTimeBetween s e rg = case secs of (t, ng) -> (addUTCTime t s, ng)
   where secs = randomSeconds rg (abs $ floor (diff s e))
 
--- | Randomly execute the given action within its schedule boundary
-runPlan :: (RandomGen g, MonadIO m) => Schedule -> IO a -> g -> m a
-runPlan sc a g = liftIO $ delayFor sc g >> a
-
-runSchedule :: (Schedule, IO a) -> IO a
-runSchedule (sc, a) = next sc a
-
--- | Run the specified action-schedule pairs
-runSchedules :: [(Schedule, IO a)] -> IO [a]
-runSchedules scs = mapM runSchedule scs
-
--- | Combine the pairs from each list & run them. Uneven lists will yield @[]@
-mergeAndRunSchedules :: [Schedule] -> [IO a] -> IO [a]
-mergeAndRunSchedules x y = runSchedules $ toPairs x y
-  where toPairs (x':xs) (y':ys) = (x', y') : toPairs xs ys
-        toPairs [] _            = []
-        toPairs _ []            = []
+runSchedule :: Frequency -> (Schedule, IO a) -> IO a
+runSchedule Once (sc, a)         = next sc a
+runSchedule (Continuous) (sc, a) = forever $ next sc a
+runSchedule (N n) (sc, a)        = error "Woops" -- replicateM n $ next sc a
