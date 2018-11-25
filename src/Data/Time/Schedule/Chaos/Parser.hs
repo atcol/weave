@@ -36,12 +36,12 @@ data Action a =
               deriving (Eq, Show)
 
 parsePlan :: B.ByteString -> Either String (Plan ())
-parsePlan = wrap . parseOnly chaosP
+parsePlan = wrap . parseOnly planP
   where wrap (Left e) = Left $ "Parse error: " ++ show e -- For testing
         wrap r        = r
 
-chaosP :: Parser (Plan ())
-chaosP = do
+planP :: Parser (Plan ())
+planP = do
   many' declaredActionP >>= mapBdys
     where mapBdys [] = do -- parse the body inline
             (fr, s) <- scheduleP
