@@ -31,7 +31,7 @@ main = do
   now <- getCurrentTime
   g <- newStdGen
   case s of
-    From f  -> B.readFile f >>= return . CP.parsePlan >>= handleParse
-    Parse s -> return (B.pack s) >>= return . CP.parsePlan >>= handleParse
+    From f  -> B.readFile f >>= return . CP.parsePlan >>= handleParse >> return ()
+    Parse s -> return (B.pack s) >>= return . CP.parsePlan >>= handleParse >> return ()
 
 handleParse = either error C.runPlan

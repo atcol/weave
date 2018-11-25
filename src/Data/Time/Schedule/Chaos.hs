@@ -26,7 +26,7 @@ module Data.Time.Schedule.Chaos
 
 import           Control.Concurrent       (threadDelay)
 import           Control.Concurrent.Async (Async (..), async)
-import           Control.Monad            (forever, replicateM)
+import           Control.Monad            (forever, replicateM, replicateM_)
 import           Control.Monad.IO.Class   (MonadIO, liftIO)
 import           Control.Monad.Reader     (Reader, runReader)
 import           Data.Bifunctor           (first)
@@ -46,7 +46,7 @@ data Schedule =
   Offset Int
   -- | A point in the future, as a @UTCTime@
   | Instant UTCTime
-  -- | A point between a lower & upper time boundary
+  -- | A lower & upper time boundary
   | Window UTCTime UTCTime
   deriving (Read, Show, Eq, Generic)
 
@@ -134,7 +134,7 @@ getDelay s t = delay
 
 -- | Construct an infinite list of constant @Offset@ instances
 mkOffsets :: Int -> [Schedule]
-mkOffsets n = fmap Offset $ repeat n
+mkOffsets n = Offset <$> repeat n
 
 -- | Construct the schedule using the supplied reader
 mkSchedules :: Reader e Schedule -> e -> [IO a] -> [(Schedule, IO a)]
@@ -149,10 +149,11 @@ randomTimeBetween :: RandomGen g => UTCTime -> UTCTime -> g -> (UTCTime, g)
 randomTimeBetween s e rg = case secs of (t, ng) -> (addUTCTime t s, ng)
   where secs = randomSeconds rg (abs $ floor (diff s e))
 
-runSchedule :: Frequency -> (Schedule, IO a) -> IO a
-runSchedule Once (sc, a)         = next sc a
+runSchedule :: Frequency -> (Schedule, IO a) -> IO [a]
+runSchedule Once (sc, a)         = next sc a >>= return . flip (:) []
 runSchedule (Continuous) (sc, a) = forever $ next sc a
-runSchedule (N n) (sc, a)        = error "Woops" -- replicateM n $ next sc a
+runSchedule (N n) (sc, a)        = replicateM n $ next sc a
 
-runPlan :: Plan a -> IO a
+-- | Execute the given plan and return its results
+runPlan :: Plan a -> IO [a]
 runPlan (Plan f s a) = runSchedule f (s, a)
