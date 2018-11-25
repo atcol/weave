@@ -17,26 +17,24 @@ import           Test.QuickCheck
 instance Arbitrary TimeUnit where
   arbitrary = elements [Seconds ..]
 
-instance Arbitrary Frequency
-
 spec :: Spec
 spec =
   describe "ParserSpec" $
     context "parsePlan - supports all TimeUnit and arbitrary values" $ do
       prop "QuickCheck - values, TimeUnit, Frequency" $
-        (\(i :: Int, u :: TimeUnit, fr :: Frequency) -> do
+        (\(i :: Int, u :: TimeUnit) -> do
           let ex1 = pack $ "every " ++ show i ++ " " ++ lc u ++ " { touch ./lol }"
-          parserTest ex1 i u
+          parserTest ex1 i u Continuous
 
           let ex2 = pack $ "in " ++ show i ++ " " ++ lc u ++ " { touch ./lol }"
-          parserTest ex2 i u)
+          parserTest ex2 i u Once)
 
       prop "QuickCheck - values, TimeUnit, Frequency and body types" $
-        (\(i :: Int, u :: TimeUnit, fr :: Frequency) -> do
+        (\(i :: Int, u :: TimeUnit) -> do
           let ex1 = pack $ "every " ++ show i ++ " " ++ lc u ++ " @ http://google.com"
               ex2 = pack $ "in " ++ show i ++ " " ++ lc u ++ " : hello there!"
-          parserTest ex1 i u
-          parserTest ex2 i u)
+          parserTest ex1 i u Continuous
+          parserTest ex2 i u Once)
 
 lc :: TimeUnit -> String
 lc = map toLower . show

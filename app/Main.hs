@@ -39,7 +39,7 @@ main = do
     From f -> B.readFile f >>= return . CP.parsePlan >>= handleParse
     _      -> run s (toSchedule s now) (callCommand (cmd s)) >> return ()
 
-handleParse = either error C.runSchedule
+handleParse = either error C.runPlan
 
 run :: Session -> Schedule -> (IO a) -> IO [a]
 run (Within _ (Just n) _) t = C.times n t

@@ -21,6 +21,7 @@ module Data.Time.Schedule.Chaos
     randomSeconds,
     randomTimeBetween,
     runSchedule,
+    runPlan
     ) where
 
 import           Control.Concurrent       (threadDelay)
@@ -152,3 +153,6 @@ runSchedule :: Frequency -> (Schedule, IO a) -> IO a
 runSchedule Once (sc, a)         = next sc a
 runSchedule (Continuous) (sc, a) = forever $ next sc a
 runSchedule (N n) (sc, a)        = error "Woops" -- replicateM n $ next sc a
+
+runPlan :: Plan a -> IO a
+runPlan (Plan f s a) = runSchedule f (s, a)
