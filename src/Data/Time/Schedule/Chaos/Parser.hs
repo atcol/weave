@@ -3,9 +3,10 @@
 
 -- | The Chaos parsing API
 module Data.Time.Schedule.Chaos.Parser (
+  Plan (..),
   TimeUnit (..),
 
-  parseTargets,
+  parsePlan,
   scheduleP,
   toMillis
   ) where
@@ -14,7 +15,8 @@ import           Control.Applicative              ((<|>))
 import           Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8            as B
 import           Data.Maybe                       (catMaybes)
-import           Data.Time.Schedule.Chaos         (Schedule (..))
+import           Data.Time.Schedule.Chaos         (Frequency (..), Plan (..),
+                                                   Schedule (..))
 import           Prelude                          hiding (takeWhile)
 import           System.Process                   (callCommand)
 
@@ -25,52 +27,53 @@ data TimeUnit = Seconds
               | Days
               deriving (Enum, Eq, Show)
 
+-- | A wrapper for actions/behaviour
 data Action a =
               -- | A basic shell
-              Shell B.ByteString
+              Shell String B.ByteString
               -- | Reference another action
               | Ref String (Action a)
               deriving (Eq, Show)
 
-parseTargets :: B.ByteString -> Either String (Schedule, IO ())
-parseTargets = wrap . parseOnly chaosP
+parsePlan :: B.ByteString -> Either String (Plan ())
+parsePlan = wrap . parseOnly planP
   where wrap (Left e) = Left $ "Parse error: " ++ show e -- For testing
         wrap r        = r
 
-chaosP :: Parser (Schedule, IO ())
-chaosP = do
-  many' (declaredActionP <|> (bodyP >>= (\a -> return ("inline", Shell a)))) >>= mapBdys
+planP :: Parser (Plan ())
+planP = do
+  many' declaredActionP >>= mapBdys
     where mapBdys [] = do -- parse the body inline
-            s <- scheduleP
+            (fr, s) <- scheduleP
             b <- bodyP --FIXME need a classifier or value ctor
-            return (s, mkAction s (Shell b))
+            return $ Plan fr s $ mkAction s (Shell "inline" b)
           mapBdys l = do
-            s <- scheduleP
+            (fr, s) <- scheduleP
             refs <- bodyRefP s l `sepBy` (char ',')
             let resolvedActions = catMaybes refs
             case resolvedActions of
               [] -> fail "Parse error: No actions found by references"
-              _  -> return (s, sequence_ $ map snd resolvedActions)
+              _  -> return $ Plan fr s $ sequence_ $ map snd resolvedActions
 
 -- | Parse a schedule
-scheduleP :: Parser Schedule
+scheduleP :: Parser (Frequency, Schedule)
 scheduleP = do
-  fn <- scheduleCtorP <?> "Schedule Parser"
+  (fr, fn) <- scheduleCtorP <?> "Schedule Parser"
   num <- fmap round double
   skipSpace
   tu <- unitP <?> "TimeUnit Parser"
   skipSpace
-  return $ fn $ num * (toMillis tu)
+  return (fr, fn $ num * (toMillis tu))
 
 -- | Parse the schedule string from plain English to its corresponding data constructor
-scheduleCtorP :: Parser (Int -> Schedule)
+scheduleCtorP :: Parser (Frequency, (Int -> Schedule))
 scheduleCtorP = do
   skipWhile ((==) '\n')
   ctorStr <- ((string "every" <?> "every") <|> (string "in" <?> "in")) <?> "Schedule ctor Parser"
   skipSpace
   case ctorStr of
-    "every" -> return Offset
-    "in"    -> return Offset
+    "every" -> return (Continuous, Offset)
+    "in"    -> return (Once, Offset)
 
 -- | Parse a @TimeUnit@ from plain English
 unitP :: Parser TimeUnit
@@ -88,7 +91,7 @@ unitP = do
     _         -> fail "Unkown schedule token"
 
 -- | Parse an action with its identifier
-declaredActionP :: Parser (B.ByteString, Action a)
+declaredActionP :: Parser (Action a)
 declaredActionP = do
   _ <- string "action" <?> "Declared Action"
   skipSpace
@@ -96,9 +99,9 @@ declaredActionP = do
   skipSpace
   bdy <- bodyP
   skipWhile ((==) '\n')
-  return (B.pack name, Shell bdy) -- FIXME parse other types
+  return (Shell name bdy) -- FIXME parse other types
 
--- | Parse a full command body, e.g. between '{' and '}'
+-- | Parse a full command body, i.e. between '{' and '}'
 bodyP :: Parser B.ByteString
 bodyP = do
   op <- (char '{' <?> "Open brace") <|>
@@ -115,14 +118,16 @@ bodyP = do
 
 -- | Parse the body reference (e.g. "action1, action2") to an action
 -- after looking up the identifier in the given list
-bodyRefP :: Schedule -> [(B.ByteString, Action a)] -> Parser (Maybe (String, IO ()))
+bodyRefP :: Schedule -> [Action a] -> Parser (Maybe (String, IO ()))
 bodyRefP _ [] = return Nothing
 bodyRefP s l = do
   skipSpace
   iden <- many1 letter_ascii
-  toAction iden $ filter ((==) iden . B.unpack . fst) $ l
-    where toAction _ []         = return Nothing
-          toAction i ((_, a):_) = return $ Just (i, mkAction s a)
+  toAction iden $ findDeclared iden
+    where findDeclared n = filter (byName n) l
+          byName n (Shell n' _) = n == n'
+          toAction _ []    = return Nothing
+          toAction i (a:_) = return $ Just (i, mkAction s a)
 
 -- | Represent our @TimeUnit@ as an @Int@
 toMillis :: TimeUnit -> Int
@@ -132,4 +137,6 @@ toMillis Hours   = (toMillis Minutes) * 60
 toMillis Days    = (toMillis Hours) * 24
 
 mkAction :: Schedule -> Action a -> IO ()
-mkAction (Offset ms) (Shell a) = callCommand $ B.unpack a
+mkAction (Offset ms) (Shell _ a) = callCommand $ B.unpack a
+mkAction (Offset ms) (Shell _ a) = callCommand $ B.unpack a
+mkAction (Offset ms) (Shell _ a) = callCommand $ B.unpack a

@@ -27,48 +27,36 @@ The `Schedule` type represents time-based parameters. There are two constructors
 
 `Offset` represents an offset from the point of calculation, e.g. +200ms.
 
+`Instant` represents a specific point in time
+
 `Window` represents a section of time.
 
 In each case, the general idea is to effectively "describe" the boundaries for
 _when_ to run a computation and the API uses this to (optionally: randomly) pick the execution
 point.
 
-### Spatial
-
-The `Spatial` type represents the parameters for deciding when to execute an action
-based on non-temporal values e.g. a counter, disk space, a random value. The API
-supports the `Reader` monad from the `mtl` package for this purpose.
-
-`Spatial` values are ultimately used as the input for mapping to `Schedule` (temporal)
-equivalents, as this allows the Chaos API to build a simple parameterised graph 
-of execution flow with "simulated" randomness within API-user specific boundaries.
-
 ## Examples
 
 There are a number of examples defined in `.chaos` files. See the `examples` folder.
 
-### Offset
-
-Execute an action within `[0, 100]` times with a random delay between "now" and 200ms:
-
-    timesIn 100 (Offset 200) (getCurrentTime >>= print)
-
-or asynchronously:
-
-    asyncTimesIn 100 (Offset 200) (getCurrentTime >>= print)
-
-This can also be demonstrated via the CLI:
-
-    atc@atc-xps:~/src/chaos$ ./chaos between --endMs 200 --cmd "echo lol; date"
-    lol
-    Sat 23 Dec 15:45:41 GMT 2017
-    [()]
-
-There is also file-based support:
+Executing the chaos binary with the following flags and a file with the contents
+as follows `chaos from apt-update.chaos`:
 
     every 6 hours {
       ssh my-server "apt-get update -y"
     }
+
+or through "declared actions":
+
+    action AptUpgrade {
+      apt-get update -y && apt-get upgrade -y
+    }
+
+    action AutoClean {
+      apt-get autoclean  
+    }
+
+    every 6 hours AptUpgrade, AutoClean
 
 ## Building
 
