@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wall #-}
 
@@ -90,6 +91,9 @@ instance Cause IO UTCTime where
   next t a = getCurrentTime >>= return . timeDiffSecs >>= (\t' -> next t' a)
     where timeDiffSecs :: UTCTime -> Int
           timeDiffSecs = round . flip diffUTCTime t
+
+instance Cause IO (UTCTime, UTCTime) where
+
 
 -- | Generate events, parameterised by time
 instance Cause IO Schedule where

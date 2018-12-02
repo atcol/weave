@@ -15,10 +15,16 @@ import           Control.Applicative              ((<|>))
 import           Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8            as B
 import           Data.Maybe                       (catMaybes)
-import           Data.Time.Schedule.Chaos         (Frequency (..), Plan (..),
-                                                   Schedule (..))
+import           Data.Time.Schedule.Chaos         (Cause (..), Frequency (..),
+                                                   Plan (..), Schedule (..))
 import           Prelude                          hiding (takeWhile)
 import           System.Process                   (callCommand)
+
+data BodyRefParseResult = InvalidOperator
+                        | NoSuchDeclaration
+                        | NoActionsDeclared
+                        | ValidAction Action
+                        deriving (Show)
 
 -- The unit of time for schedule expressions
 data TimeUnit = Seconds
@@ -28,29 +34,30 @@ data TimeUnit = Seconds
               deriving (Enum, Eq, Show)
 
 -- | A wrapper for actions/behaviour
-data Action a =
-              -- | A basic shell
+data Action = -- | A basic shell command
               Shell String B.ByteString
               -- | Reference another action
-              | Ref String (Action a)
+              | Ref String Action
               deriving (Eq, Show)
 
+-- | Parse the entire Plan from the given string
 parsePlan :: B.ByteString -> Either String (Plan ())
 parsePlan = wrap . parseOnly planP
   where wrap (Left e) = Left $ "Parse error: " ++ show e -- For testing
         wrap r        = r
 
+-- | The entire plan document parser
 planP :: Parser (Plan ())
 planP = do
   many' declaredActionP >>= mapBdys
     where mapBdys [] = do -- parse the body inline
             (fr, s) <- scheduleP
             b <- bodyP --FIXME need a classifier or value ctor
-            return $ Plan fr s $ mkAction s (Shell "inline" b)
+            return $ Plan fr s $ actionToIO s (Shell "inline" b)
           mapBdys l = do
             (fr, s) <- scheduleP
-            refs <- bodyRefP s l `sepBy` (char ',')
-            let resolvedActions = catMaybes refs
+            actRefs <- actionReferenceP s l
+            let resolvedActions = catMaybes actRefs
             case resolvedActions of
               [] -> fail "Parse error: No actions found by references"
               _  -> return $ Plan fr s $ sequence_ $ map snd resolvedActions
@@ -91,7 +98,7 @@ unitP = do
     _         -> fail "Unkown schedule token"
 
 -- | Parse an action with its identifier
-declaredActionP :: Parser (Action a)
+declaredActionP :: Parser Action
 declaredActionP = do
   _ <- string "action" <?> "Declared Action"
   skipSpace
@@ -116,18 +123,29 @@ bodyP = do
           inverse '@' = '\n'
           inverse ':' = '\n'
 
--- | Parse the body reference (e.g. "action1, action2") to an action
+-- | Parse a list of action references, delimited by an operator: @&@, @|@, @~@, @,@
+actionReferenceP :: Schedule -> [Action] -> Parser [(Action, Char)]
+actionReferenceP s l = do
+  dar <- bodyRefP l `sepBy` (char ',') <|> bodyRefP l `sepBy` (char '|')
+  return $ map (\re ->
+        case re of
+          InvalidOperator -> error "Invalid operator"
+          ValidAction a   -> error "Work out the operators" -- return (a, ???)
+          _               -> error "To shell/io" -- FIXME parse to shell/io
+      ) dar
+
+-- | Parse one body reference (e.g. one of "action1, action2") to an action
 -- after looking up the identifier in the given list
-bodyRefP :: Schedule -> [Action a] -> Parser (Maybe (String, IO ()))
-bodyRefP _ [] = return Nothing
-bodyRefP s l = do
+bodyRefP :: [Action] -> Parser BodyRefParseResult
+bodyRefP [] = return NoActionsDeclared
+bodyRefP l = do
   skipSpace
   iden <- many1 letter_ascii
-  toAction iden $ findDeclared iden
+  toAction $ findDeclared iden
     where findDeclared n = filter (byName n) l
           byName n (Shell n' _) = n == n'
-          toAction _ []    = return Nothing
-          toAction i (a:_) = return $ Just (i, mkAction s a)
+          toAction []    = return NoSuchDeclaration
+          toAction (a:_) = return $ ValidAction a
 
 -- | Represent our @TimeUnit@ as an @Int@
 toMillis :: TimeUnit -> Int
@@ -136,7 +154,7 @@ toMillis Minutes = (toMillis Seconds) * 60
 toMillis Hours   = (toMillis Minutes) * 60
 toMillis Days    = (toMillis Hours) * 24
 
-mkAction :: Schedule -> Action a -> IO ()
-mkAction (Offset ms) (Shell _ a) = callCommand $ B.unpack a
-mkAction (Offset ms) (Shell _ a) = callCommand $ B.unpack a
-mkAction (Offset ms) (Shell _ a) = callCommand $ B.unpack a
+actionToIO :: Schedule -> Action -> IO ()
+actionToIO (Offset ms)  (Shell _ a) = next ms $ callCommand $ B.unpack a
+actionToIO (Instant t) (Shell _ a)  = next t $ callCommand $ B.unpack a
+actionToIO (Window s e) (Shell _ a) = next (s, e) $ callCommand $ B.unpack a
