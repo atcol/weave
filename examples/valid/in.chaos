@@ -1,5 +1,1 @@
-in 2 seconds {
-  date > date.now
-  sleep 2
-  date >> date.now
-}
+in 2 seconds date

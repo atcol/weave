@@ -10,15 +10,22 @@ import           Data.Time.Schedule.Chaos.Parser (parsePlan)
 import           System.Directory
 import           Test.Hspec
 
-type ValidationFunction = (Either String (Plan ())) -> Expectation
+type ValidationFunction = FilePath -> Either String (Plan ()) -> Expectation
 
 spec :: Spec
 spec = do
   describe "Parser" $ do
-    it "Supports valid examples" $
-      runTest "./examples/valid" validParseTest
-    it "Rejects invalid examples" $ do
-      runTest "examples/invalid" invalidParseTest
+    context "Supports valid examples" $ do
+
+      it "General" $
+        runTest "./examples/valid" validOffsetTest
+
+      it "Operators" $
+        runTest "./examples/valid/frequency" validFrequencyTest
+
+    context "Rejects invalid examples" $ do
+      it "Fails with a parse error" $
+        runTest "examples/invalid" shouldNotParseTest
 
 getExamples :: FilePath -> IO [BS.ByteString]
 getExamples p = getDirectoryContents p
@@ -27,13 +34,18 @@ getExamples p = getDirectoryContents p
     where isChaosFile = isSuffixOf ".chaos"
           absPath f = p ++ "/" ++ f
 
-validParseTest :: (Either String (Plan ())) -> Expectation
-validParseTest (Right (Plan fr s _)) = s `shouldNotBe` Offset 0
-validParseTest (Left l)              = error $ "Parse error: " ++ show l
+validOffsetTest :: FilePath -> Either String (Plan ()) -> Expectation
+validOffsetTest _ (Left l)             = error $ "Parse error: " ++ show l
+validOffsetTest _ (Right (Plan _ s _)) = s `shouldNotBe` Offset 0
 
-invalidParseTest :: (Either String (Plan ())) -> Expectation
-invalidParseTest (Right (Plan fr s _)) = error $ "Failure expected: " ++ show s
-invalidParseTest (Left l)       = l `shouldSatisfy` isInfixOf "Parse error"
+validFrequencyTest :: FilePath -> Either String (Plan ()) -> Expectation
+validFrequencyTest _ (Left l)              = error $ "Parse error: " ++ show l
+validFrequencyTest p (Right (Plan fr _ _)) = fr `shouldBe` (getFrequency p)
+  where getFrequency = read . takeWhile ((/=) '.')
+
+shouldNotParseTest :: FilePath -> Either String (Plan ()) -> Expectation
+shouldNotParseTest _ (Right (Plan _ s _)) = error $ "Failure expected: " ++ show s
+shouldNotParseTest _ (Left l)             = l `shouldSatisfy` isInfixOf "Parse error"
 
 runTest :: FilePath -> ValidationFunction -> Expectation
 runTest p f = do
@@ -41,4 +53,4 @@ runTest p f = do
   length exs `shouldNotBe` 0
   forM_ exs (\ex -> do
     print $ "Testing: " ++ show ex
-    f $ parsePlan ex)
+    f p $ parsePlan ex)

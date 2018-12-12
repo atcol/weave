@@ -1,0 +1,9 @@
+action grepMagicNumber {
+  grep 18
+}
+
+action writeToFile {
+  tee > blah
+}
+
+every 5 seconds date | grepMagicNumber | writeToFile

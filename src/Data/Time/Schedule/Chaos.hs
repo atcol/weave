@@ -52,7 +52,7 @@ data Schedule =
   deriving (Read, Show, Eq, Generic)
 
 -- | The amount of times of some "thing", e.g. action, schedule
-data Frequency = Once | Continuous | N Int deriving (Eq, Show)
+data Frequency = Once | Continuous | N Int deriving (Eq, Read, Show)
 
 -- | Operations for sourcing events
 class (MonadIO m) => Cause m s where

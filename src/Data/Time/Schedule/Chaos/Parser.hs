@@ -7,26 +7,28 @@ module Data.Time.Schedule.Chaos.Parser (
   TimeUnit (..),
 
   parsePlan,
-  scheduleP,
+  temporalP,
   toMillis
   ) where
 
 import           Control.Applicative              ((<|>))
 import           Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8            as B
-import           Data.Maybe                       (catMaybes)
 import           Data.Time.Schedule.Chaos         (Cause (..), Frequency (..),
                                                    Plan (..), Schedule (..))
+import           Debug.Trace                      (traceM)
 import           Prelude                          hiding (takeWhile)
 import           System.Process                   (callCommand)
 
-data BodyRefParseResult = InvalidOperator
-                        | NoSuchDeclaration
-                        | NoActionsDeclared
-                        | ValidAction Action
-                        deriving (Show)
+-- | All possible outcomes of an actoin reference parse
+data ActionRefParseResult =
+                          -- | The action reference was not found
+                          ActionNotFound String
+                          -- | The identified action reference
+                          | ActionRef String Action
+                          deriving (Show)
 
--- The unit of time for schedule expressions
+-- | The unit of time supported as Temporal Expressions
 data TimeUnit = Seconds
               | Minutes
               | Hours
@@ -36,8 +38,8 @@ data TimeUnit = Seconds
 -- | A wrapper for actions/behaviour
 data Action = -- | A basic shell command
               Shell String B.ByteString
-              -- | Reference another action
-              | Ref String Action
+              -- | Nothing is declared
+              | Undefined
               deriving (Eq, Show)
 
 -- | Parse the entire Plan from the given string
@@ -46,29 +48,34 @@ parsePlan = wrap . parseOnly planP
   where wrap (Left e) = Left $ "Parse error: " ++ show e -- For testing
         wrap r        = r
 
--- | The entire plan document parser
+-- | The entire document parser
 planP :: Parser (Plan ())
-planP = do
-  many' declaredActionP >>= mapBdys
-    where mapBdys [] = do -- parse the body inline
-            (fr, s) <- scheduleP
-            b <- bodyP --FIXME need a classifier or value ctor
-            return $ Plan fr s $ actionToIO s (Shell "inline" b)
-          mapBdys l = do
-            (fr, s) <- scheduleP
-            actRefs <- actionReferenceP s l
-            let resolvedActions = catMaybes actRefs
-            case resolvedActions of
-              [] -> fail "Parse error: No actions found by references"
-              _  -> return $ Plan fr s $ sequence_ $ map snd resolvedActions
+planP = many' actionBlockP >>= scheduleP
 
--- | Parse a schedule
-scheduleP :: Parser (Frequency, Schedule)
-scheduleP = do
-  (fr, fn) <- scheduleCtorP <?> "Schedule Parser"
-  num <- fmap round double
+-- | Parse the temporal and action reference section
+scheduleP :: [Action] -> Parser (Plan ())
+scheduleP l = do
+  (fr, s) <- temporalP
+  r <- option Undefined inlineBodyP
+  case r of
+    Undefined -> actionExpressionsP l >>= return . Plan fr s . sequence_ . map (actionToIO s . fst)
+    shell -> return $ Plan fr s (actionToIO s shell)
+
+-- | Parse many action expressions
+actionExpressionsP :: [Action] -> Parser [(Action, B.ByteString)]
+actionExpressionsP l = many1 (actionExpressionP l)
+
+-- | Parse the inline action declaration
+inlineBodyP :: Parser Action
+inlineBodyP = Shell "inline" <$> bodyP
+
+-- | Parse a frequency and schedule
+temporalP :: Parser (Frequency, Schedule)
+temporalP = do
+  (fr, fn) <- scheduleCtorP <?> "Schedule Constructor"
+  num <- round <$> double
   skipSpace
-  tu <- unitP <?> "TimeUnit Parser"
+  tu <- unitP <?> "TimeUnit"
   skipSpace
   return (fr, fn $ num * (toMillis tu))
 
@@ -76,11 +83,12 @@ scheduleP = do
 scheduleCtorP :: Parser (Frequency, (Int -> Schedule))
 scheduleCtorP = do
   skipWhile ((==) '\n')
-  ctorStr <- ((string "every" <?> "every") <|> (string "in" <?> "in")) <?> "Schedule ctor Parser"
+  ctorStr <- ((string "every" <?> "every") <|> (string "in" <?> "in")) <?> "Schedule Ctor"
   skipSpace
   case ctorStr of
     "every" -> return (Continuous, Offset)
     "in"    -> return (Once, Offset)
+    s       -> error $ "Unknown frequency: " ++ show s
 
 -- | Parse a @TimeUnit@ from plain English
 unitP :: Parser TimeUnit
@@ -88,18 +96,18 @@ unitP = do
   ctorStr <- (string "seconds"
               <|> string "minutes"
               <|> string "hours"
-              <|> string "days") <?> "Unit ctor Parser"
+              <|> string "days") <?> "Unit ctor"
   skipSpace
   case ctorStr of
     "seconds" -> return Seconds
     "minutes" -> return Minutes
     "hours"   -> return Hours
     "days"    -> return Days
-    _         -> fail "Unkown schedule token"
+    t         -> error $ "Unkown schedule token: " ++ show t
 
--- | Parse an action with its identifier
-declaredActionP :: Parser Action
-declaredActionP = do
+-- | Parse an action block
+actionBlockP :: Parser Action
+actionBlockP = do
   _ <- string "action" <?> "Declared Action"
   skipSpace
   name <- many1 letter_ascii
@@ -112,40 +120,42 @@ declaredActionP = do
 bodyP :: Parser B.ByteString
 bodyP = do
   op <- (char '{' <?> "Open brace") <|>
-          (char '@' <?> "URL") <|>
-          (char ':' <?> "Plain text")
+        (char '@' <?> "URL") <|>
+        (char ':' <?> "Plain text")
   skipSpace
   -- Will this fail on embedded } ?
-  res <- takeWhile (/= (inverse op)) <?> "Body contents Parser"
+  res <- takeWhile (/= (inverse op)) <?> "Body contents"
   skipMany (char $ inverse op)
   return res
     where inverse '{' = '}'
           inverse '@' = '\n'
           inverse ':' = '\n'
 
--- | Parse a list of action references, delimited by an operator: @&@, @|@, @~@, @,@
-actionReferenceP :: Schedule -> [Action] -> Parser [(Action, Char)]
-actionReferenceP s l = do
-  dar <- bodyRefP l `sepBy` (char ',') <|> bodyRefP l `sepBy` (char '|')
-  return $ map (\re ->
-        case re of
-          InvalidOperator -> error "Invalid operator"
-          ValidAction a   -> error "Work out the operators" -- return (a, ???)
-          _               -> error "To shell/io" -- FIXME parse to shell/io
-      ) dar
+-- | Parse the body reference and an operator on its RHS
+actionExpressionP :: [Action] -> Parser (Action, B.ByteString)
+actionExpressionP l = do
+  ref <- actionReferenceP l
+  c <- option defaultOperator operatorsP
+  f ref $ B.pack $ show c
+    where f (ActionRef _ a) c    = return (a, c)
+          f (ActionNotFound i) c = return (Shell i "", c)
+          defaultOperator = ' '
 
--- | Parse one body reference (e.g. one of "action1, action2") to an action
--- after looking up the identifier in the given list
-bodyRefP :: [Action] -> Parser BodyRefParseResult
-bodyRefP [] = return NoActionsDeclared
-bodyRefP l = do
+-- | Parse a supported operator
+operatorsP :: Parser Char
+operatorsP = skipSpace >> char '|' <|> char '&' <|> char ',' <|> char '¬'
+
+-- | Parse one body reference (e.g. @action1@ in @action1 | action2@) to an action
+-- and find its action in the given list
+actionReferenceP :: [Action] -> Parser ActionRefParseResult
+actionReferenceP l = do
   skipSpace
   iden <- many1 letter_ascii
-  toAction $ findDeclared iden
+  summarise iden (findDeclared iden)
     where findDeclared n = filter (byName n) l
           byName n (Shell n' _) = n == n'
-          toAction []    = return NoSuchDeclaration
-          toAction (a:_) = return $ ValidAction a
+          summarise i [] = return $ ActionNotFound i
+          summarise i x  = return $ ActionRef i $ head x -- only take the first
 
 -- | Represent our @TimeUnit@ as an @Int@
 toMillis :: TimeUnit -> Int

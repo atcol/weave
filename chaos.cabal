@@ -1,13 +1,13 @@
 name:                chaos
 version:             0.1.0.0
-synopsis:            IO scheduling and testing API and CLI
-description:         Predictable and unpredictable scheduling API for IO actions
+synopsis:            A DSL for event generation & integration
+description:         A DSL for event generation & integration
 homepage:            https://github.com/atcol/chaos#readme
 license:             BSD3
 license-file:        LICENSE
 author:              Alex Collins
 maintainer:          atc@alexcollins.org
-copyright:           2017 Alex Collins
+copyright:           2017, 2018 Alex Collins
 category:            API
 build-type:          Simple
 extra-source-files:  README.md
