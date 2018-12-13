@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/atcol/weave.svg?branch=master)](https://travis-ci.org/atcol/chaos)
+[![Build Status](https://travis-ci.org/atcol/weave.svg?branch=master)](https://travis-ci.org/atcol/weave)
 
 # weave
 
