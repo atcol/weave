@@ -1,6 +1,6 @@
 This tool defines the following grammar with respect to its file-based support.
 
-    <chaos-specification> ::= <freq-modifier> <cause-spec> <opt-body>
+    <chaos-specification> ::= <freq-modifier> <cause-spec> <opt-body> | <freq-modifier> <cause-spec> <action-ref> <operator>
     <freq-modifier> ::= "randomly" | "exponentially" | "every" | "in"
     <cause-spec> ::= <spatial-spec> | <temporal-spec>
     <spatial-spec> ::= "TBD"

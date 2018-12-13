@@ -16,7 +16,6 @@ import           Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8            as B
 import           Data.Time.Schedule.Chaos         (Cause (..), Frequency (..),
                                                    Plan (..), Schedule (..))
-import           Debug.Trace                      (traceM)
 import           Prelude                          hiding (takeWhile)
 import           System.Process                   (callCommand)
 
@@ -41,6 +40,10 @@ data Action = -- | A basic shell command
               -- | Nothing is declared
               | Undefined
               deriving (Eq, Show)
+
+-- | The default operator if none is supplied
+defaultOperator :: Char
+defaultOperator = ','
 
 -- | Parse the entire Plan from the given string
 parsePlan :: B.ByteString -> Either String (Plan ())
@@ -130,6 +133,7 @@ bodyP = do
     where inverse '{' = '}'
           inverse '@' = '\n'
           inverse ':' = '\n'
+          inverse c   = error $ "Unknown body enclosing character: " ++ show c
 
 -- | Parse the body reference and an operator on its RHS
 actionExpressionP :: [Action] -> Parser (Action, B.ByteString)
@@ -139,11 +143,14 @@ actionExpressionP l = do
   f ref $ B.pack $ show c
     where f (ActionRef _ a) c    = return (a, c)
           f (ActionNotFound i) c = return (Shell i "", c)
-          defaultOperator = ' '
 
 -- | Parse a supported operator
 operatorsP :: Parser Char
-operatorsP = skipSpace >> char '|' <|> char '&' <|> char ',' <|> char '¬'
+operatorsP = do
+  skipSpace
+  c <- char '|' <|> char '&' <|> char ',' <|> char '¬'
+  skipSpace
+  return c
 
 -- | Parse one body reference (e.g. @action1@ in @action1 | action2@) to an action
 -- and find its action in the given list
@@ -154,6 +161,7 @@ actionReferenceP l = do
   summarise iden (findDeclared iden)
     where findDeclared n = filter (byName n) l
           byName n (Shell n' _) = n == n'
+          byName _ Undefined    = False
           summarise i [] = return $ ActionNotFound i
           summarise i x  = return $ ActionRef i $ head x -- only take the first
 

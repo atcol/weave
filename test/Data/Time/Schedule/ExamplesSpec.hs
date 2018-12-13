@@ -15,17 +15,19 @@ type ValidationFunction = FilePath -> Either String (Plan ()) -> Expectation
 spec :: Spec
 spec = do
   describe "Parser" $ do
-    context "Supports valid examples" $ do
+    context "Valid examples" $ do
 
-      it "General" $
-        runTest "./examples/valid" validOffsetTest
+      it "General" $ do
+        runTest "./examples/valid" validOffset
+
+        runTest "./examples/valid/frequency" validFrequency
 
       it "Operators" $
-        runTest "./examples/valid/frequency" validFrequencyTest
+        runTest "./examples/valid/operators" validOperator
 
-    context "Rejects invalid examples" $ do
+    context "Invalid examples" $ do
       it "Fails with a parse error" $
-        runTest "examples/invalid" shouldNotParseTest
+        runTest "examples/invalid" shouldNotParse
 
 getExamples :: FilePath -> IO [BS.ByteString]
 getExamples p = getDirectoryContents p
@@ -34,18 +36,21 @@ getExamples p = getDirectoryContents p
     where isChaosFile = isSuffixOf ".chaos"
           absPath f = p ++ "/" ++ f
 
-validOffsetTest :: FilePath -> Either String (Plan ()) -> Expectation
-validOffsetTest _ (Left l)             = error $ "Parse error: " ++ show l
-validOffsetTest _ (Right (Plan _ s _)) = s `shouldNotBe` Offset 0
+validOperator :: FilePath -> Either String (Plan ()) -> Expectation
+validOperator _ _ = pendingWith "To-do"
 
-validFrequencyTest :: FilePath -> Either String (Plan ()) -> Expectation
-validFrequencyTest _ (Left l)              = error $ "Parse error: " ++ show l
-validFrequencyTest p (Right (Plan fr _ _)) = fr `shouldBe` (getFrequency p)
-  where getFrequency = read . takeWhile ((/=) '.')
+validOffset :: FilePath -> Either String (Plan ()) -> Expectation
+validOffset _ (Left l)             = error $ "Parse error: " ++ show l
+validOffset _ (Right (Plan _ s _)) = s `shouldNotBe` Offset 0
 
-shouldNotParseTest :: FilePath -> Either String (Plan ()) -> Expectation
-shouldNotParseTest _ (Right (Plan _ s _)) = error $ "Failure expected: " ++ show s
-shouldNotParseTest _ (Left l)             = l `shouldSatisfy` isInfixOf "Parse error"
+validFrequency :: FilePath -> Either String (Plan ()) -> Expectation
+validFrequency _ (Left l)              = error $ "Parse error: " ++ show l
+validFrequency p (Right (Plan fr _ _)) = fr `shouldBe` (getFrequency p)
+  where getFrequency _ = Once --FIXME derive this from the filename
+
+shouldNotParse :: FilePath -> Either String (Plan ()) -> Expectation
+shouldNotParse _ (Right (Plan _ s _)) = error $ "Failure expected: " ++ show s
+shouldNotParse _ (Left l)             = l `shouldSatisfy` isInfixOf "Parse error"
 
 runTest :: FilePath -> ValidationFunction -> Expectation
 runTest p f = do
