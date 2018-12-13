@@ -2,17 +2,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 
-module Data.Time.Schedule.Chaos.ParserSpec ( spec ) where
+module Weave.ParserSpec ( spec ) where
 
-import qualified Data.ByteString                 as B
-import           Data.ByteString.Char8           (pack)
-import           Data.Char                       (toLower)
-import           Data.Either                     (either)
-import           Data.Time.Schedule.Chaos
-import           Data.Time.Schedule.Chaos.Parser
+import qualified Data.ByteString       as B
+import           Data.ByteString.Char8 (pack)
+import           Data.Char             (toLower)
+import           Data.Either           (either)
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
+import           Weave
+import           Weave.Parser
 
 instance Arbitrary TimeUnit where
   arbitrary = elements [Seconds ..]

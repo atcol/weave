@@ -3,7 +3,7 @@
 {-| An API & DSL for event generation.
 
 -}
-module Data.Time.Schedule.Chaos.Tutorial
+module Weave.Tutorial
   (
     -- * Introduction
     -- $introduction

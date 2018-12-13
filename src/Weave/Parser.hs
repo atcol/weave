@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall #-}
 
--- | The Chaos parsing API
-module Data.Time.Schedule.Chaos.Parser (
+-- | The Weave parsing API
+module Weave.Parser (
   Plan (..),
   TimeUnit (..),
 
@@ -14,10 +14,10 @@ module Data.Time.Schedule.Chaos.Parser (
 import           Control.Applicative              ((<|>))
 import           Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8            as B
-import           Data.Time.Schedule.Chaos         (Cause (..), Frequency (..),
-                                                   Plan (..), Schedule (..))
 import           Prelude                          hiding (takeWhile)
 import           System.Process                   (callCommand)
+import           Weave                            (Cause (..), Frequency (..),
+                                                   Plan (..), Schedule (..))
 
 -- | All possible outcomes of an actoin reference parse
 data ActionRefParseResult =

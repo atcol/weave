@@ -4,8 +4,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wall #-}
 
--- | The core Chaos API
-module Data.Time.Schedule.Chaos
+-- | The core Weave API
+module Weave
   (
     -- | Typeclasses
     Cause (..),

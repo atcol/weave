@@ -1,14 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall #-}
 
-module Data.Time.Schedule.ExamplesSpec ( spec ) where
-import           Control.Monad                   (filterM, forM_, mapM)
-import qualified Data.ByteString.Char8           as BS
+module ExamplesSpec ( spec ) where
+import           Control.Monad         (filterM, forM_, mapM)
+import qualified Data.ByteString.Char8 as BS
 import           Data.List
-import           Data.Time.Schedule.Chaos
-import           Data.Time.Schedule.Chaos.Parser (parsePlan)
 import           System.Directory
 import           Test.Hspec
+import           Weave
+import           Weave.Parser          (parsePlan)
 
 type ValidationFunction = FilePath -> Either String (Plan ()) -> Expectation
 

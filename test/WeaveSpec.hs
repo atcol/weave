@@ -1,15 +1,12 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Data.Time.Schedule.ChaosSpec ( spec ) where
+module WeaveSpec ( spec ) where
 
 import           Control.Applicative       ((<$>), (<*>))
 import           Control.Monad.IO.Class    (liftIO)
 import           Control.Monad.Reader      (Reader, asks)
 import           Data.Time.Clock           (NominalDiffTime, UTCTime (..),
                                             diffUTCTime, getCurrentTime)
-import           Data.Time.Schedule.Chaos  (Cause (..), Schedule (..), genTime,
-                                            mkSchedules, randomSeconds,
-                                            randomTimeBetween)
 import           Debug.Trace               (traceM, traceShow)
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.Random             (RandomGen, newStdGen)
@@ -19,6 +16,9 @@ import           Test.QuickCheck           hiding (within)
 import           Test.QuickCheck.Instances
 import           Test.QuickCheck.IO        ()
 import           Test.QuickCheck.Random
+import           Weave                     (Cause (..), Schedule (..), genTime,
+                                            mkSchedules, randomSeconds,
+                                            randomTimeBetween)
 
 data ExampleEnv = ExampleEnv { st :: String, int :: Int } deriving Show
 
