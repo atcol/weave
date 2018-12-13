@@ -1,12 +1,12 @@
-[![Build Status](https://travis-ci.org/atcol/chaos.svg?branch=master)](https://travis-ci.org/atcol/chaos)
+[![Build Status](https://travis-ci.org/atcol/weave.svg?branch=master)](https://travis-ci.org/atcol/chaos)
 
-# chaos
+# weave
 
 An API, CLI and DSL for event generation & (un)predictable scheduling.
 
 ## Motivation
 
-Chaos is an experiment exploring the ideas of a rich event generation DSL combined with parameterising unpredictability
+weave is an experiment exploring the ideas of a rich event generation DSL combined with parameterising unpredictability
 for actions.
 
 ## Domain
@@ -37,7 +37,7 @@ point.
 
 ## Examples
 
-There are a number of examples defined in `.chaos` files. See the `examples` folder.
+There are a number of examples defined in `.weave` files. See the `examples` folder.
 
 Executing the chaos binary with the following flags and a file with the contents
 as follows `chaos from apt-update.chaos`:
