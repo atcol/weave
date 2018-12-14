@@ -19,7 +19,7 @@ library
   build-depends:       base >= 4.7 && < 5
                      , async
                      , attoparsec
-                     , bytestring
+                     , text
                      , mtl
                      , process
                      , random
@@ -32,7 +32,7 @@ executable weave
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
-                     , bytestring
+                     , text
                      , weave
                      , process
                      , optparse-generic
@@ -46,7 +46,7 @@ test-suite weave-test
   main-is:             Spec.hs
   other-modules:       WeaveSpec, ExamplesSpec, Weave.ParserSpec
   build-depends:       base
-                     , bytestring
+                     , text
                      , weave
                      , directory
                      , hspec

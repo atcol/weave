@@ -11,6 +11,7 @@ module Weave
     Cause (..),
 
     -- | Data constructors
+    Action (..),
     Frequency (..),
     Plan (..),
     Schedule (..),
@@ -25,21 +26,28 @@ module Weave
     runPlan
     ) where
 
-import           Control.Concurrent       (threadDelay)
-import           Control.Concurrent.Async (Async (..), async)
-import           Control.Monad            (forever, replicateM, replicateM_)
-import           Control.Monad.IO.Class   (MonadIO, liftIO)
-import           Control.Monad.Reader     (Reader, runReader)
-import           Data.Bifunctor           (first)
-import           Data.List                (repeat)
-import           Data.Time.Clock          (NominalDiffTime, UTCTime, addUTCTime,
-                                           diffUTCTime, getCurrentTime)
+import           Control.Concurrent     (threadDelay)
+import           Control.Monad          (forever, replicateM)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.Reader   (Reader, runReader)
+import           Data.Bifunctor         (first)
+import           Data.List              (repeat)
+import qualified Data.Text              as T
+import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
+                                         diffUTCTime, getCurrentTime)
 import           GHC.Generics
-import           System.Random            (Random (..), RandomGen, newStdGen,
-                                           randomR)
+import           System.Random          (Random (..), RandomGen, newStdGen,
+                                         randomR)
 
--- | An execution plan
-data Plan a = Plan Frequency Schedule (IO a)
+-- | A wrapper for actions/behaviour
+data Action = -- | A basic shell command
+              Shell { actName :: T.Text, actBody :: T.Text }
+              -- | Nothing is declared
+              | Undefined
+              deriving (Eq, Show)
+
+-- | An execution plan, grouping a trigger type (@Schedule@) and actions and their operators
+data Plan a = Plan [(Frequency, Schedule)] [(Action, Char)]
 
 -- | An event source descriptor based on time
 data Schedule =
@@ -160,4 +168,4 @@ runSchedule (N n) (sc, a)        = replicateM n $ next sc a
 
 -- | Execute the given plan and return its results
 runPlan :: Plan a -> IO [a]
-runPlan (Plan f s a) = runSchedule f (s, a)
+runPlan (Plan [] []) = error "No actions or schedules defined" -- runSchedule f (s, a)
