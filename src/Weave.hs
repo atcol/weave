@@ -2,31 +2,35 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {-# OPTIONS_GHC -Wall #-}
 
 -- | The core Weave API
 module Weave
   (
     -- | Typeclasses
-    Cause (..),
+    Weave (..),
 
     -- | Data constructors
     Action (..),
     Frequency (..),
+    Operator,
     Plan (..),
     Schedule (..),
+    Statement (..),
 
     -- | Functions
+    defaultOperator,
     genTime,
     mkOffsets,
     mkSchedules,
     randomSeconds,
     randomTimeBetween,
-    runSchedule,
+    --runSchedule,
     runPlan
     ) where
 
-import           Control.Concurrent     (threadDelay)
+import           Control.Concurrent     (forkIO, threadDelay)
 import           Control.Monad          (forever, replicateM)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Reader   (Reader, runReader)
@@ -36,8 +40,19 @@ import qualified Data.Text              as T
 import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
                                          diffUTCTime, getCurrentTime)
 import           GHC.Generics
+import           GHC.IO.Handle          (Handle (..), hGetContents, hPutStr)
+import           GHC.IO.Handle.FD       (stderr, stdin, stdout)
+import           System.Process         (ProcessHandle (..),
+                                         runInteractiveCommand, spawnCommand)
 import           System.Random          (Random (..), RandomGen, newStdGen,
                                          randomR)
+
+-- | An operator for deciding what to do with action results, where:
+--  - , means "ignore"
+--  - | is "pipe", just like a unix pipe
+--  - & is logical AND
+--  - || is logical OR
+type Operator = Char
 
 -- | A wrapper for actions/behaviour
 data Action = -- | A basic shell command
@@ -46,8 +61,21 @@ data Action = -- | A basic shell command
               | Undefined
               deriving (Eq, Show)
 
--- | An execution plan, grouping a trigger type (@Schedule@) and actions and their operators
-data Plan a = Plan [(Frequency, Schedule)] [(Action, Char)]
+-- | A wrapper for a process and its in, out and error handles
+data Process = Process Handle Handle Handle ProcessHandle
+
+-- | A descriptor of a cause and some associated action expressions
+data Statement = Temporal Frequency Schedule [(Action, Char)]
+  deriving (Eq, Show)
+
+-- | An execution plan with a trigger type (@Statement@)
+data Plan = Plan [Statement]
+  deriving (Show)
+--
+-- | The default operator if none is supplied
+defaultOperator :: Operator
+defaultOperator = ','
+
 
 -- | An event source descriptor based on time
 data Schedule =
@@ -63,7 +91,7 @@ data Schedule =
 data Frequency = Once | Continuous | N Int deriving (Eq, Read, Show)
 
 -- | Operations for sourcing events
-class (MonadIO m) => Cause m s where
+class (MonadIO m) => Weave m s where
 
   -- | Request the next event, where @s@ is the event source descriptor,
   -- and @m b@ is the event generation action
@@ -86,7 +114,7 @@ class (MonadIO m) => Cause m s where
   -- | Generate an event, using @s@ as the *upper* bound
   upper :: s -> m b -> m b
 
-instance Cause IO Int where
+instance Weave IO Int where
   next = lower
 
   -- | A delay of @ms@ milliseconds before executing @a@
@@ -94,27 +122,23 @@ instance Cause IO Int where
 
   --upper ms a = newStdGen >>= genTime (Offset ms) >>=
 
-instance Cause IO UTCTime where
+instance Weave IO UTCTime where
   -- | A delay of @t - getCurrentTime@  before executing @a@
   next t a = getCurrentTime >>= return . timeDiffSecs >>= (\t' -> next t' a)
     where timeDiffSecs :: UTCTime -> Int
           timeDiffSecs = round . flip diffUTCTime t
 
-instance Cause IO (UTCTime, UTCTime) where
-
+instance Weave IO (UTCTime, UTCTime) where
+  next (s, e) a = newStdGen >>= return . randomTimeBetween s e >>= flip next a . fst
 
 -- | Generate events, parameterised by time
-instance Cause IO Schedule where
+instance Weave IO Schedule where
 
   next (Offset ms) a  = next ms a
   next (Window s e) a = newStdGen >>=
     return . randomTimeBetween s e >>=
     return . fst >>=
     (\t -> next t a)
-
--- | Asynchronous convenience wrapper for @timesIn@
---asyncTimesIn :: Int -> Schedule -> IO a -> IO [Async a]
---asyncTimesIn n s a = timesIn n s (async a)
 
 -- | Randomly pick a time compatible with the given schedule
 genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (UTCTime, g)
@@ -161,11 +185,34 @@ randomTimeBetween :: RandomGen g => UTCTime -> UTCTime -> g -> (UTCTime, g)
 randomTimeBetween s e rg = case secs of (t, ng) -> (addUTCTime t s, ng)
   where secs = randomSeconds rg (abs $ floor (diff s e))
 
-runSchedule :: Frequency -> (Schedule, IO a) -> IO [a]
-runSchedule Once (sc, a)         = next sc a >>= return . flip (:) []
-runSchedule (Continuous) (sc, a) = forever $ next sc a
-runSchedule (N n) (sc, a)        = replicateM n $ next sc a
+--runSchedule :: Frequency -> (Schedule, IO a) -> IO [a]
+--runSchedule Once (sc, a)         = next sc a >>= return . flip (:) []
+--runSchedule (Continuous) (sc, a) = forever $ next sc a
+--runSchedule (N n) (sc, a)        = replicateM n $ next sc a
 
 -- | Execute the given plan and return its results
-runPlan :: Plan a -> IO [a]
-runPlan (Plan [] []) = error "No actions or schedules defined" -- runSchedule f (s, a)
+runPlan :: Plan -> IO ()
+runPlan (Plan []) = error "No actions or schedules defined"
+runPlan (Plan x)  = undefined -- map (sequence . statementToProcess) x
+
+-- | Prepare  @Statement@ to a list of processes and their operators
+statementToProcess :: Statement -> [(IO Process, Operator)]
+statementToProcess (Temporal q s []) =
+  statementToProcess (Temporal q s [(Shell "inline" "", defaultOperator)]) --FIXME ensure actionless parsing works
+statementToProcess (Temporal q s x) = undefined
+
+actionToProcess :: Schedule -> Action -> IO Process
+actionToProcess (Offset m)   (Shell _ a) = next m $ run a
+actionToProcess (Instant t)  (Shell _ a) = next t $ run a
+actionToProcess (Window s e) (Shell _ a) = next (s, e) $ run a
+
+-- | Take the batch command and create a process from it
+run :: T.Text -> IO Process
+run b = do
+  c <- runInteractiveCommand (T.unpack b)
+  return $ toProc c
+    where toProc (i, o, e, ph) = Process i o e ph
+
+-- | Chain the two process by their @stdout@ and @stdin@, respectively
+chain :: Process -> Process -> IO ()
+chain (Process i _ _ _) (Process _ o _ _) = hGetContents i >>= forkIO . hPutStr o >> return ()

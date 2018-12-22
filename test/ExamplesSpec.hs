@@ -3,7 +3,7 @@
 
 module ExamplesSpec ( spec ) where
 
-import           Control.Monad    (filterM, forM_, mapM)
+import           Control.Monad    (filterM, forM_, mapM_)
 import           Data.List
 import qualified Data.Text        as T
 import qualified Data.Text.IO     as T
@@ -12,7 +12,7 @@ import           Test.Hspec
 import           Weave
 import           Weave.Parser     (parsePlan)
 
-type ValidationFunction = FilePath -> Either String (Plan ()) -> Expectation
+type ValidationFunction = FilePath -> Either String Plan -> Expectation
 
 spec :: Spec
 spec = do
@@ -29,7 +29,7 @@ spec = do
 
     context "Invalid examples" $ do
       it "Fails with a parse error" $
-        runTest "examples/invalid" shouldNotParse
+        runTest "examples/invalid" emptyParse
 
 getExamples :: FilePath -> IO [T.Text]
 getExamples p = getDirectoryContents p
@@ -38,21 +38,26 @@ getExamples p = getDirectoryContents p
     where isWeaveFile = isSuffixOf ".weave"
           absPath f = p ++ "/" ++ f
 
-validOperator :: FilePath -> Either String (Plan a) -> Expectation
+validOperator :: FilePath -> Either String Plan -> Expectation
 validOperator _ _ = pendingWith "To-do"
 
-validOffset :: FilePath -> Either String (Plan a) -> Expectation
-validOffset _ (Left l)           = error $ "Parse error: " ++ show l
-validOffset _ (Right (Plan s _)) = (lengthIs s 1) >> ((snd (head s)) `shouldNotBe` Offset 0)
+validOffset :: FilePath -> Either String Plan -> Expectation
+validOffset _ (Left l)         = error $ "Parse error: " ++ show l
+validOffset _ (Right (Plan s)) = (lengthIs s 1) >>
+  mapM_ (\(Temporal _ sc _) -> sc `shouldNotBe` Offset 0) s
 
-validFrequency :: FilePath -> Either String (Plan a) -> Expectation
-validFrequency _ (Left l)            = error $ "Parse error: " ++ show l
-validFrequency p (Right (Plan s _)) = (lengthIs s 1) >> ((fst (head s)) `shouldBe` (getFrequency p))
+validFrequency :: FilePath -> Either String Plan -> Expectation
+validFrequency _ (Left l)         = error $ "Parse error: " ++ show l
+validFrequency p (Right (Plan s)) = (lengthIs s 1) >>
+  (mapM_ (\(Temporal f _ _) -> f `shouldBe` getFrequency p) s)
   where getFrequency _ = Once --FIXME derive this from the filename
 
-shouldNotParse :: FilePath -> Either String (Plan a) -> Expectation
-shouldNotParse _ (Right (Plan _ s)) = error $ "Failure expected: " ++ show s
-shouldNotParse _ (Left l)             = l `shouldSatisfy` isInfixOf "Parse error"
+shouldNotParse :: FilePath -> Either String Plan -> Expectation
+shouldNotParse _ (Right p) = error $ "No statements should be parsed: " ++ show p
+shouldNotParse _ (Left l)         = l `shouldSatisfy` isInfixOf "Parse error"
+
+emptyParse :: FilePath -> Either String Plan -> Expectation
+emptyParse _ (Right (Plan s)) = length s `shouldBe` 0
 
 lengthIs :: [a] -> Int -> Expectation
 lengthIs x n = length x `shouldBe` n

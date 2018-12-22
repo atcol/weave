@@ -41,8 +41,7 @@ lc = map toLower . show
 parserTest :: T.Text -> Int -> TimeUnit -> Frequency -> Expectation
 parserTest ex i u f =
   either error onSuccess $ parsePlan ex
-    where onSuccess (Plan f' s) = do
-                                length f' `shouldBe` 1
-                                length s `shouldBe` 1
-                                fst (head f') `shouldBe` f
-                                snd (head f') `shouldBe` Offset (i * (toMillis u))
+    where onSuccess (Plan []) = error "Empty plan"
+          onSuccess (Plan ((Temporal fr s _):_)) = do
+                                fr `shouldBe` f
+                                s `shouldBe` Offset (i * (toMillis u))

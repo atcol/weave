@@ -13,7 +13,6 @@ import           Control.Applicative  ((<|>))
 import           Data.Attoparsec.Text
 import qualified Data.Text            as T
 import           Prelude              hiding (takeWhile)
-import           System.Process       (spawnCommand)
 import           Weave
 
 -- | All possible outcomes of an actoin reference parse
@@ -30,25 +29,31 @@ data TimeUnit = Seconds
               | Days
               deriving (Enum, Eq, Show)
 
--- | The default operator if none is supplied
-defaultOperator :: Char
-defaultOperator = ','
-
 -- | Parse the entire Plan from the given string
-parsePlan :: T.Text -> Either String (Plan ())
-parsePlan = wrap . parseOnly planP
+parsePlan :: T.Text -> Either String Plan
+parsePlan i = wrap $ parseOnly planP i
   where wrap (Left e) = Left $ "Parse error: " ++ show e -- For testing
         wrap r        = r
 
 -- | The entire document parser
-planP :: Parser (Plan a)
+planP :: Parser Plan
 planP = do
   acts <- many' actionBlockP
-  (fr, s)  <- temporalP
+  stmts <- many' $ statementP acts
+  return $ Plan stmts
+
+statementP :: [Action] -> Parser Statement
+statementP acts = do
+  (fr, s) <- temporalP
+  Temporal fr s <$> inlineOrReferenceP acts
+
+-- | Parse an inline body or action reference expression
+inlineOrReferenceP :: [Action] -> Parser [(Action, Char)]
+inlineOrReferenceP acts = do
   r <- option Undefined inlineBodyP
   case r of
-    Undefined -> actionExpressionsP acts >>= return . Plan [(fr, s)]
-    shell     -> return $ Plan [(fr, s)] [(shell, defaultOperator)]
+    Undefined -> actionExpressionsP acts
+    shell     -> return [(shell, defaultOperator)]
 
 -- | Parse the inline action declaration
 inlineBodyP :: Parser Action
@@ -157,10 +162,3 @@ toMillis Seconds = 1000
 toMillis Minutes = (toMillis Seconds) * 60
 toMillis Hours   = (toMillis Minutes) * 60
 toMillis Days    = (toMillis Hours) * 24
-
---actionToIO :: Schedule -> (Action, T.Text) -> IO a
-actionToIO (Offset m)   (Shell _ a, b) = next m $ spawnCommand $ T.unpack b
-actionToIO (Instant t)  (Shell _ a, b) = next t $ spawnCommand $ T.unpack b
-actionToIO (Window s e) (Shell _ a, b) = next (s, e) $ spawnCommand $ T.unpack b
-
---processBody :: T.Text IO (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)

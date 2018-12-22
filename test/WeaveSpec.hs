@@ -16,7 +16,7 @@ import           Test.QuickCheck           hiding (within)
 import           Test.QuickCheck.Instances
 import           Test.QuickCheck.IO        ()
 import           Test.QuickCheck.Random
-import           Weave                     (Cause (..), Schedule (..), genTime,
+import           Weave                     (Schedule (..), Weave (..), genTime,
                                             mkSchedules, randomSeconds,
                                             randomTimeBetween)
 
