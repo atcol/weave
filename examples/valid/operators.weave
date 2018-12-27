@@ -6,4 +6,4 @@ action writeToFile {
   tee > blah
 }
 
-every 5 seconds date | grepMagicNumber | writeToFile
+every 5s date | grepMagicNumber | writeToFile

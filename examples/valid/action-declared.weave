@@ -3,4 +3,4 @@ action date {
   sleep 2
   date >> date.now
 }
-in 2 seconds date
+in 2s date

@@ -25,7 +25,7 @@ spec = do
         runTest "./examples/valid/frequency" validFrequency
 
       it "Operators" $
-        runTest "./examples/valid/operators" validOperator
+        runTest "./examples/valid/operators" validOffset
 
     context "Invalid examples" $ do
       it "Fails with a parse error" $

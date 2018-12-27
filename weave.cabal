@@ -21,6 +21,7 @@ library
                      , attoparsec
                      , text
                      , mtl
+                     , pipes
                      , process
                      , random
                      , time

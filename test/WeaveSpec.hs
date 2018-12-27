@@ -17,8 +17,7 @@ import           Test.QuickCheck.Instances
 import           Test.QuickCheck.IO        ()
 import           Test.QuickCheck.Random
 import           Weave                     (Schedule (..), Weave (..), genTime,
-                                            mkSchedules, randomSeconds,
-                                            randomTimeBetween)
+                                            randomSeconds, randomTimeBetween)
 
 data ExampleEnv = ExampleEnv { st :: String, int :: Int } deriving Show
 
@@ -75,28 +74,6 @@ spec = do
     context "interval" $ do
       now <- runIO $ getCurrentTime
       prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now
-
-    context "mkSchedules" $ do
-      prop "Benign on empty input" prop_mkSchedule_benign_empty_input
-
-      prop "Simple reader example" prop_mkSchedule_example
-
-
-prop_mkSchedule_example :: ExampleEnv -> [IO String] -> Expectation
-prop_mkSchedule_example ex l = do
-  let res = mkSchedules reader ex l
-  actual res `shouldBe` (expected res)
-  where v s n = n * (length s)
-        offset _ = Offset $ v (st ex) (int ex)
-        expected res = map offset res
-        actual res = map fst res
-        reader = do
-                s <- asks st
-                n <- asks int
-                return (Offset $ v s n)
-
-prop_mkSchedule_benign_empty_input sc = do
-  length (mkSchedules (return sc) () []) `shouldBe` 0
 
 prop_interval_alwaysInRange n e sc@(Window st en) ioa =
   intervalRestriction n e sc ==> do

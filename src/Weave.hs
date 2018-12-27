@@ -22,8 +22,6 @@ module Weave
     -- | Functions
     defaultOperator,
     genTime,
-    mkOffsets,
-    mkSchedules,
     randomSeconds,
     randomTimeBetween,
     --runSchedule,
@@ -32,18 +30,26 @@ module Weave
 
 import           Control.Concurrent     (forkIO, threadDelay)
 import           Control.Monad          (forever, replicateM)
+import           Control.Monad.Fail     (MonadFail (..))
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Reader   (Reader, runReader)
 import           Data.Bifunctor         (first)
 import           Data.List              (repeat)
 import qualified Data.Text              as T
+import qualified Data.Text.IO           as TI
 import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
                                          diffUTCTime, getCurrentTime)
 import           GHC.Generics
 import           GHC.IO.Handle          (Handle (..), hGetContents, hPutStr)
 import           GHC.IO.Handle.FD       (stderr, stdin, stdout)
-import           System.Process         (ProcessHandle (..),
-                                         runInteractiveCommand, spawnCommand)
+import           Pipes                  (Consumer (..), Pipe (..),
+                                         Producer (..), await, cat, for, lift,
+                                         runEffect, yield, (>->))
+import qualified Pipes.Prelude          as P
+import           System.Exit            (ExitCode (..))
+import           System.Process         (CreateProcess (..), ProcessHandle (..),
+                                         StdStream (..), createProcess_,
+                                         readCreateProcessWithExitCode, shell)
 import           System.Random          (Random (..), RandomGen, newStdGen,
                                          randomR)
 
@@ -56,10 +62,19 @@ type Operator = Char
 
 -- | A wrapper for actions/behaviour
 data Action = -- | A basic shell command
-              Shell { actName :: T.Text, actBody :: T.Text }
+              Shell { shName :: T.Text, actBody :: T.Text }
               -- | Nothing is declared
               | Undefined
               deriving (Eq, Show)
+
+
+-- | Wraps the result of (attempting) an action
+data ActionResult =
+                   -- | The action succeded
+                   Success T.Text
+                  -- | The action did not execute
+                  | Failure T.Text
+  deriving (Eq, Show)
 
 -- | A wrapper for a process and its in, out and error handles
 data Process = Process Handle Handle Handle ProcessHandle
@@ -168,14 +183,6 @@ getDelay s t = delay
         micros = 1000 * 1000
         delay = abs $ tDiff * micros
 
--- | Construct an infinite list of constant @Offset@ instances
-mkOffsets :: Int -> [Schedule]
-mkOffsets n = Offset <$> repeat n
-
--- | Construct the schedule using the supplied reader
-mkSchedules :: Reader e Schedule -> e -> [IO a] -> [(Schedule, IO a)]
-mkSchedules r e acts = map (\ac -> (runReader r e, ac)) acts
-
 -- | Generate seconds in the interval [0, n]
 randomSeconds :: RandomGen g => g -> Int -> (NominalDiffTime, g)
 randomSeconds rg mx = first realToFrac $ randomR (0, mx) rg
@@ -185,34 +192,56 @@ randomTimeBetween :: RandomGen g => UTCTime -> UTCTime -> g -> (UTCTime, g)
 randomTimeBetween s e rg = case secs of (t, ng) -> (addUTCTime t s, ng)
   where secs = randomSeconds rg (abs $ floor (diff s e))
 
---runSchedule :: Frequency -> (Schedule, IO a) -> IO [a]
---runSchedule Once (sc, a)         = next sc a >>= return . flip (:) []
---runSchedule (Continuous) (sc, a) = forever $ next sc a
---runSchedule (N n) (sc, a)        = replicateM n $ next sc a
+runSchedule :: Frequency -> Schedule -> IO a -> IO [a]
+runSchedule Once sc a       = next sc a >>= return . flip (:) []
+runSchedule Continuous sc a = forever $ next sc a
+runSchedule (N n) sc a      = replicateM n $ next sc a
 
 -- | Execute the given plan and return its results
 runPlan :: Plan -> IO ()
-runPlan (Plan []) = error "No actions or schedules defined"
-runPlan (Plan x)  = undefined -- map (sequence . statementToProcess) x
+runPlan (Plan x)  = mapM_ statementToProcess x -- map (sequence . statementToProcess) x
 
 -- | Prepare  @Statement@ to a list of processes and their operators
-statementToProcess :: Statement -> [(IO Process, Operator)]
+statementToProcess :: Statement -> IO ()
 statementToProcess (Temporal q s []) =
   statementToProcess (Temporal q s [(Shell "inline" "", defaultOperator)]) --FIXME ensure actionless parsing works
-statementToProcess (Temporal q s x) = undefined
+statementToProcess (Temporal q s (x:xs)) = runSchedule q s (runEffect $ for (asProducer (fst x) >-> pipes xs) (lift . print)) >> return ()
 
-actionToProcess :: Schedule -> Action -> IO Process
-actionToProcess (Offset m)   (Shell _ a) = next m $ run a
-actionToProcess (Instant t)  (Shell _ a) = next t $ run a
-actionToProcess (Window s e) (Shell _ a) = next (s, e) $ run a
+-- | Folds the given actions into a pipe that interact according to their operator
+pipes :: [(Action, Operator)] -> Pipe ActionResult ActionResult IO ()
+pipes xs = foldr asPipe cat xs
 
--- | Take the batch command and create a process from it
-run :: T.Text -> IO Process
-run b = do
-  c <- runInteractiveCommand (T.unpack b)
-  return $ toProc c
-    where toProc (i, o, e, ph) = Process i o e ph
+-- | A folding operator for an action and the previous pipe
+asPipe :: (Action, Operator) -> Pipe ActionResult ActionResult IO () -> Pipe ActionResult ActionResult IO ()
+asPipe (a, opr) p = p >-> do
+  o <- await
+  case o of
+    Success r -> do
+      r <- liftIO $ pipeProcs opr r a
+      yield r
+    f         -> yield f
 
--- | Chain the two process by their @stdout@ and @stdin@, respectively
-chain :: Process -> Process -> IO ()
-chain (Process i _ _ _) (Process _ o _ _) = hGetContents i >>= forkIO . hPutStr o >> return ()
+-- | Convert the @Action@ to a @Producer@
+asProducer :: Action -> Producer ActionResult IO ()
+asProducer (Shell n b) = do
+  (c, o, e) <- liftIO $ readCreateProcessWithExitCode (shell (T.unpack b)){ std_out = CreatePipe } ""
+  case c of
+    ExitFailure ec -> yield $ Failure $ T.concat ["Action ", n, " failed with code ", T.pack $ show ec, T.pack e]
+    ExitSuccess -> do
+      yield $ Success (T.pack o)
+
+pipeProcs :: Operator -> T.Text -> Action -> IO ActionResult
+pipeProcs opr r (Shell n b) = do
+  case opr of
+    '|' -> do
+      mp <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){
+                      std_out = CreatePipe, std_in = CreatePipe }
+            >>= (\(i,o',_,_) -> return (i, o'))
+      case mp of
+        (Just ip, Just op) -> do
+              liftIO $ TI.putStrLn n
+              liftIO $ hPutStr ip (T.unpack r)
+              liftIO $ hGetContents op >>= return . Success . T.pack
+        _ -> return $ Failure $ T.concat ["Could not create stdin/stdout pipes for ", n]
+
+

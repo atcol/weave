@@ -83,17 +83,17 @@ scheduleCtorP = do
 -- | Parse a @TimeUnit@ from plain English
 unitP :: Parser TimeUnit
 unitP = do
-  ctorStr <- (string "seconds"
-              <|> string "minutes"
-              <|> string "hours"
-              <|> string "days") <?> "Unit ctor"
+  ctorStr <- (string "s"
+              <|> string "m"
+              <|> string "h"
+              <|> string "d") <?> "Unit ctor"
   skipSpace
   case ctorStr of
-    "seconds" -> return Seconds
-    "minutes" -> return Minutes
-    "hours"   -> return Hours
-    "days"    -> return Days
-    t         -> error $ "Unkown schedule token: " ++ show t
+    "s" -> return Seconds
+    "m" -> return Minutes
+    "h" -> return Hours
+    "d" -> return Days
+    t   -> error $ "Unkown schedule token: " ++ show t
 
 -- | Parse an action block
 actionBlockP :: Parser Action
@@ -133,7 +133,7 @@ actionExpressionP l = do
   c <- option defaultOperator operatorsP
   f ref c
     where f (ActionRef _ a) c    = return (a, c)
-          f (ActionNotFound i) c = return (Shell i "", c)
+          f (ActionNotFound i) c = return (Shell i i, c)
 
 -- | Parse a supported operator
 operatorsP :: Parser Char
