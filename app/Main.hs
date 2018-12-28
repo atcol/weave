@@ -19,9 +19,7 @@ import           Weave           as W
 import           Weave.Parser    as WP
 
 -- | A configuration type
-data Session =
-  Parse String
-  | From String
+data Session = Session { filename :: Maybe String , raw :: Maybe String }
   deriving (Show, Generic)
 
 instance ParseRecord Session
@@ -31,8 +29,10 @@ main = do
   s <- getRecord "Chaos" :: IO Session
   now <- getCurrentTime
   g <- newStdGen
-  case s of
-    From f  -> T.readFile f >>= return . WP.parsePlan >>= handleParse >> return ()
-    Parse s -> return (T.pack s) >>= return . WP.parsePlan >>= handleParse >> return ()
+  execute s
+
+execute (Session (Just f) _) = T.readFile f >>= return . WP.parsePlan >>= handleParse >> return ()
+execute (Session _ (Just s)) = return (T.pack s) >>= return . WP.parsePlan >>= handleParse >> return ()
+execute  _                 = getContents >>= return . Session Nothing . Just >>= execute
 
 handleParse = either error W.runPlan
