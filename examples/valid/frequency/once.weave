@@ -1,0 +1,4 @@
+action LineCount {
+  wc -l -
+}
+in 5s ls | LineCount

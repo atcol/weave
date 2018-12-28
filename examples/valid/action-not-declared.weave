@@ -4,4 +4,4 @@ action date {
   date >> date.now
 }
 
-in 2 seconds NonExistentAction
+in 2s NonExistentAction

@@ -5,17 +5,18 @@
 
 module Main where
 
-import qualified Data.ByteString.Char8           as B
-import           Data.Either                     (either)
-import           Data.Maybe                      (fromMaybe)
-import           Data.Time.Clock                 (NominalDiffTime, UTCTime,
-                                                  addUTCTime, getCurrentTime)
-import           Data.Time.Schedule.Chaos        as C
-import           Data.Time.Schedule.Chaos.Parser as CP
+import           Data.Either     (either)
+import           Data.Maybe      (fromMaybe)
+import qualified Data.Text       as T
+import qualified Data.Text.IO    as T
+import           Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime,
+                                  getCurrentTime)
 import           GHC.Generics
 import           Options.Generic
 import           System.Process
-import           System.Random                   (newStdGen)
+import           System.Random   (newStdGen)
+import           Weave           as W
+import           Weave.Parser    as WP
 
 -- | A configuration type
 data Session =
@@ -31,7 +32,7 @@ main = do
   now <- getCurrentTime
   g <- newStdGen
   case s of
-    From f  -> B.readFile f >>= return . CP.parsePlan >>= handleParse >> return ()
-    Parse s -> return (B.pack s) >>= return . CP.parsePlan >>= handleParse >> return ()
+    From f  -> T.readFile f >>= return . WP.parsePlan >>= handleParse >> return ()
+    Parse s -> return (T.pack s) >>= return . WP.parsePlan >>= handleParse >> return ()
 
-handleParse = either error C.runPlan
+handleParse = either error W.runPlan

@@ -1,0 +1,9 @@
+action date {
+  date
+}
+
+action echo {
+  echo "lol"
+}
+
+every 2s date, echo

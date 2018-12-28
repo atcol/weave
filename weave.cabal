@@ -1,13 +1,13 @@
-name:                chaos
+name:                weave
 version:             0.1.0.0
-synopsis:            IO scheduling and testing API and CLI
-description:         Predictable and unpredictable scheduling API for IO actions
-homepage:            https://github.com/atcol/chaos#readme
+synopsis:            A DSL for event generation & integration
+description:         A DSL for event generation & integration
+homepage:            https://github.com/atcol/weave#readme
 license:             BSD3
 license-file:        LICENSE
 author:              Alex Collins
-maintainer:          atc@alexcollins.org
-copyright:           2017 Alex Collins
+maintainer:          alex@alexcollins.email
+copyright:           2017, 2018 Alex Collins
 category:            API
 build-type:          Simple
 extra-source-files:  README.md
@@ -15,39 +15,40 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Data.Time.Schedule.Chaos, Data.Time.Schedule.Chaos.Parser, Data.Time.Schedule.Chaos.Tutorial
+  exposed-modules:     Weave, Weave.Parser, Weave.Tutorial
   build-depends:       base >= 4.7 && < 5
                      , async
                      , attoparsec
-                     , bytestring
+                     , text
                      , mtl
+                     , pipes
                      , process
                      , random
                      , time
                      , transformers
   default-language:    Haskell2010
 
-executable chaos
+executable weave
   hs-source-dirs:      app
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
-                     , bytestring
-                     , chaos
+                     , text
+                     , weave
                      , process
                      , optparse-generic
                      , random
                      , time
   default-language:    Haskell2010
 
-test-suite chaos-test
+test-suite weave-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
-  other-modules:       Data.Time.Schedule.ChaosSpec, Data.Time.Schedule.ExamplesSpec, Data.Time.Schedule.Chaos.ParserSpec
+  other-modules:       WeaveSpec, ExamplesSpec, Weave.ParserSpec
   build-depends:       base
-                     , bytestring
-                     , chaos
+                     , text
+                     , weave
                      , directory
                      , hspec
                      , mtl
@@ -62,4 +63,4 @@ test-suite chaos-test
 
 source-repository head
   type:     git
-  location: https://github.com/atcol/chaos
+  location: https://github.com/atcol/weave

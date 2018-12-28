@@ -1,12 +1,12 @@
-[![Build Status](https://travis-ci.org/atcol/chaos.svg?branch=master)](https://travis-ci.org/atcol/chaos)
+[![Build Status](https://travis-ci.org/atcol/weave.svg?branch=master)](https://travis-ci.org/atcol/weave)
 
-# chaos
+# weave
 
 An API, CLI and DSL for event generation & (un)predictable scheduling.
 
 ## Motivation
 
-Chaos is an experiment exploring the ideas of a rich event generation DSL combined with parameterising unpredictability
+weave is an experiment exploring the ideas of a rich event generation DSL combined with parameterising unpredictability
 for actions.
 
 ## Domain
@@ -35,9 +35,30 @@ In each case, the general idea is to effectively "describe" the boundaries for
 _when_ to run a computation and the API uses this to (optionally: randomly) pick the execution
 point.
 
+## Parsing
+
+Chaos supports defining events and their actions through a DSL.
+
+The BNF can be see in the `chaos.bnf` file, but generally the form for the DSL is:
+
+`<trigger> <action-list>`
+
+where `trigger` is the schedule or spatial specification, and `action-list` is
+a list of declared actions, an in-line action (`{ ssh server -c "apt-get update" }`)
+or a shell expression (`'blah | grep | tail -1`) to run, delimited by an operator.
+
+### Operators
+
+The delimiter for the action list supports basic bash-like operators:
+
+ * `|`
+ * `&&`
+ * `||`
+ * ``
+
 ## Examples
 
-There are a number of examples defined in `.chaos` files. See the `examples` folder.
+There are a number of examples defined in `.weave` files. See the `examples` folder.
 
 Executing the chaos binary with the following flags and a file with the contents
 as follows `chaos from apt-update.chaos`:
