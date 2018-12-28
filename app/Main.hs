@@ -25,14 +25,10 @@ data Session = Session { filename :: Maybe String , raw :: Maybe String }
 instance ParseRecord Session
 
 main :: IO ()
-main = do
-  s <- getRecord "Chaos" :: IO Session
-  now <- getCurrentTime
-  g <- newStdGen
-  execute s
+main = (getRecord "Chaos" :: IO Session) >>= execute
 
 execute (Session (Just f) _) = T.readFile f >>= return . WP.parsePlan >>= handleParse >> return ()
 execute (Session _ (Just s)) = return (T.pack s) >>= return . WP.parsePlan >>= handleParse >> return ()
-execute  _                 = getContents >>= return . Session Nothing . Just >>= execute
+execute  _                   = getContents >>= return . Session Nothing . Just >>= execute
 
 handleParse = either error W.runPlan
