@@ -208,7 +208,9 @@ runPlan (Plan x)  = mapM_ statementToProcess x -- map (sequence . statementToPro
 statementToProcess :: Statement -> IO ()
 statementToProcess (Temporal q s []) =
   statementToProcess (Temporal q s [(Shell "inline" "", defaultOperator)]) --FIXME ensure actionless parsing works
-statementToProcess (Temporal q s (x:xs)) = runSchedule q s (runEffect $ for (asProducer x >-> pipes xs) (lift . print)) >> return ()
+statementToProcess (Temporal q s (x:xs)) = runSchedule q s (runEffect $ for (asProducer x >-> pipes xs) (rawPrint . fst)) >> return ()
+  where rawPrint (Success r) = lift $ putStrLn $ T.unpack r
+        rawPrint (Failure r) = lift $ putStrLn $ "Error:" ++ T.unpack r
 
 -- | Folds the given actions into a pipe that interact according to their operator
 pipes :: [(Action, Operator)] -> Pipe ActResOpPair ActResOpPair IO ()
