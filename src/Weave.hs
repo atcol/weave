@@ -60,6 +60,9 @@ import           System.Random          (Random (..), RandomGen, newStdGen,
 --  - || is logical OR
 type Operator = Char
 
+-- | For brevity - the result of an action and the operator to apply
+type ActResOpPair = (ActionResult, Operator)
+
 -- | A wrapper for actions/behaviour
 data Action = -- | A basic shell command
               Shell { shName :: T.Text, actBody :: T.Text }
@@ -205,43 +208,43 @@ runPlan (Plan x)  = mapM_ statementToProcess x -- map (sequence . statementToPro
 statementToProcess :: Statement -> IO ()
 statementToProcess (Temporal q s []) =
   statementToProcess (Temporal q s [(Shell "inline" "", defaultOperator)]) --FIXME ensure actionless parsing works
-statementToProcess (Temporal q s (x:xs)) = runSchedule q s (runEffect $ for (asProducer (fst x) >-> pipes xs) (lift . print)) >> return ()
+statementToProcess (Temporal q s (x:xs)) = runSchedule q s (runEffect $ for (asProducer x >-> pipes xs) (lift . print)) >> return ()
 
 -- | Folds the given actions into a pipe that interact according to their operator
-pipes :: [(Action, Operator)] -> Pipe ActionResult ActionResult IO ()
+pipes :: [(Action, Operator)] -> Pipe ActResOpPair ActResOpPair IO ()
 pipes xs = foldr asPipe cat xs
 
 -- | A folding operator for an action and the previous pipe
-asPipe :: (Action, Operator) -> Pipe ActionResult ActionResult IO () -> Pipe ActionResult ActionResult IO ()
+asPipe :: (Action, Operator) -> Pipe ActResOpPair ActResOpPair IO () -> Pipe ActResOpPair ActResOpPair IO ()
 asPipe (a, opr) p = p >-> do
   o <- await
-  case o of
-    Success r -> do
-      r <- liftIO $ pipeProcs opr r a
-      yield r
-    f         -> yield f
+  re <- liftIO $ pipeProcs o a
+  yield re
 
 -- | Convert the @Action@ to a @Producer@
-asProducer :: Action -> Producer ActionResult IO ()
-asProducer (Shell n b) = do
+asProducer :: (Action, Operator) -> Producer ActResOpPair IO ()
+asProducer ((Shell n b), op) = do
   (c, o, e) <- liftIO $ readCreateProcessWithExitCode (shell (T.unpack b)){ std_out = CreatePipe } ""
   case c of
-    ExitFailure ec -> yield $ Failure $ T.concat ["Action ", n, " failed with code ", T.pack $ show ec, T.pack e]
+    ExitFailure ec -> yield (Failure $ T.concat ["Action ", n, " failed with code: ", T.pack $ show ec, T.pack e], op)
     ExitSuccess -> do
-      yield $ Success (T.pack o)
+      yield (Success (T.pack o), op)
 
-pipeProcs :: Operator -> T.Text -> Action -> IO ActionResult
-pipeProcs opr r (Shell n b) = do
+pipeProcs :: ActResOpPair -> Action -> IO ActResOpPair
+pipeProcs ((Success r, opr)) (Shell n b) = do
   case opr of
-    '|' -> do
-      mp <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){
-                      std_out = CreatePipe, std_in = CreatePipe }
-            >>= (\(i,o',_,_) -> return (i, o'))
-      case mp of
-        (Just ip, Just op) -> do
-              liftIO $ TI.putStrLn n
-              liftIO $ hPutStr ip (T.unpack r)
-              liftIO $ hGetContents op >>= return . Success . T.pack
-        _ -> return $ Failure $ T.concat ["Could not create stdin/stdout pipes for ", n]
-
-
+    '|' -> chain
+    '&' -> chain
+    ',' ->  do
+      (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
+            >>= (\(_,o,_,_) -> return o)
+      liftIO $ hGetContents op >>= wrapS
+    _ -> return (Failure $ T.concat ["Unsupported operator '", T.singleton opr, "'"], opr)
+  where wrapS ot = return (Success (T.pack ot), opr)
+        chain = do
+          (Just ip, Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){
+                          std_out = CreatePipe, std_in = CreatePipe }
+                >>= (\(i,o',_,_) -> return (i, o'))
+          liftIO $ hPutStr ip (T.unpack r)
+          liftIO $ hGetContents op >>= wrapS
+pipeProcs r@(Failure _, _) _ = return r

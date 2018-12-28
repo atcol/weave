@@ -18,7 +18,11 @@ instance Arbitrary TimeUnit where
 
 spec :: Spec
 spec =
-  describe "ParserSpec" $
+  describe "ParserSpec" $ do
+    context "Hardcoded examples" $ do
+      it "every 2s date | wc" $ do
+        parserTest "every 2s date | wc" 2 Seconds Continuous
+
     context "parsePlan - supports all TimeUnit and arbitrary values" $ do
       prop "QuickCheck - values, TimeUnit, Frequency" $
         (\(i :: Int, u :: TimeUnit) -> do
