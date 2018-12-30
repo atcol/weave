@@ -83,17 +83,14 @@ scheduleCtorP = do
 -- | Parse a @TimeUnit@ from plain English
 unitP :: Parser TimeUnit
 unitP = do
-  ctorStr <- (string "s"
-              <|> string "m"
-              <|> string "h"
-              <|> string "d") <?> "Unit ctor"
+  le <- letter <?> "Unit ctor"
   skipSpace
-  case ctorStr of
-    "s" -> return Seconds
-    "m" -> return Minutes
-    "h" -> return Hours
-    "d" -> return Days
-    t   -> error $ "Unkown schedule token: " ++ show t
+  return $ ct le
+  where ct 's' = Seconds
+        ct 'm' = Minutes
+        ct 'h' = Hours
+        ct 'd' = Days
+        ct t   = error $ "Unkown schedule token: " ++ show t
 
 -- | Parse an action block
 actionBlockP :: Parser Action
