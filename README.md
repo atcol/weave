@@ -11,7 +11,7 @@ for actions.
 
 ## Domain
 
-There are a number of ideas that are central to the design & philosophy of the API & tooling that Chaos provides. 
+There are a number of ideas that are central to the design & philosophy of the API & tooling that Weave provides. 
 
 | Concept | Description |
 |---------|-------------|
@@ -37,9 +37,9 @@ point.
 
 ## Parsing
 
-Chaos supports defining events and their actions through a DSL.
+Weave supports defining events and their actions through a DSL.
 
-The BNF can be see in the `chaos.bnf` file, but generally the form for the DSL is:
+The BNF can be see in the `weave.bnf` file, but generally the form for the DSL is:
 
 `<trigger> <action-list>`
 
@@ -61,7 +61,7 @@ The delimiter for the action list supports basic bash-like operators:
 There are a number of examples defined in `.weave` files. See the `examples` folder.
 
 Executing the chaos binary with the following flags and a file with the contents
-as follows `chaos from apt-update.chaos`:
+as follows `weave --file apt-update.chaos`:
 
     every 6 hours {
       ssh my-server "apt-get update -y"
@@ -69,11 +69,11 @@ as follows `chaos from apt-update.chaos`:
 
 or through "declared actions":
 
-    action AptUpgrade {
+    shell AptUpgrade {
       apt-get update -y && apt-get upgrade -y
     }
 
-    action AutoClean {
+    shell AutoClean {
       apt-get autoclean  
     }
 
