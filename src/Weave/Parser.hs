@@ -108,13 +108,15 @@ unitP = do
 -- | Parse an action block
 actionBlockP :: Parser Action
 actionBlockP = do
-  _ <- string "action" <?> "Declared Action"
+  blkType <- (many1 letter <?> "Shell action") >>= return . T.pack
   skipSpace
   name <- many1 letter >>= return . T.pack
   skipSpace
   bdy <- bodyP
   skipWhile ((==) '\n')
-  return (Shell name bdy) -- FIXME parse other types
+  con blkType name bdy
+    where con "shell" n b = return $ Shell n b -- FIXME parse other types
+          con t _ _       = fail $ "Unsupported body type " ++ T.unpack t
 
 -- | Parse a full command body, i.e. between '{' and '}'
 bodyP :: Parser T.Text

@@ -1,4 +1,4 @@
-action date {
+shell date {
   date > date.now
   sleep 2
   date >> date.now

@@ -1,8 +1,8 @@
-action grepMagicNumber {
+shell grepMagicNumber {
   grep 18
 }
 
-action writeToFile {
+shell writeToFile {
   tee > blah
 }
 

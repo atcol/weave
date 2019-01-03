@@ -1,8 +1,8 @@
-action date {
+shell date {
   date
 }
 
-action echo {
+shell echo {
   echo "lol"
 }
 
