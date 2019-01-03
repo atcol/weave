@@ -28,24 +28,23 @@ module Weave
     runPlan
     ) where
 
-import           Control.Concurrent     (forkIO, threadDelay)
+import           Control.Concurrent     (threadDelay)
 import           Control.Monad          (forever, replicateM)
-import           Control.Monad.Fail     (MonadFail (..))
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Reader   (Reader, runReader)
 import           Data.Bifunctor         (first)
-import           Data.List              (repeat)
 import qualified Data.Text              as T
 import qualified Data.Text.IO           as TI
 import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
                                          diffUTCTime, getCurrentTime)
 import           GHC.Generics
-import           GHC.IO.Handle          (Handle (..), hGetContents, hPutStr)
-import           GHC.IO.Handle.FD       (stderr, stdin, stdout)
+import           GHC.IO.Handle          (Handle, hGetContents)
+import           GHC.IO.Handle.FD       (stdin, stdout)
 import           Pipes                  (Consumer (..), Pipe (..),
                                          Producer (..), await, cat, for, lift,
                                          runEffect, yield, (>->))
 import qualified Pipes.Prelude          as P
+import           Protolude              hiding (diff, for)
 import           System.Exit            (ExitCode (..))
 import           System.Process         (CreateProcess (..), ProcessHandle (..),
                                          StdStream (..), createProcess_,
@@ -66,21 +65,19 @@ type ActResOpPair = (ActionResult, Operator)
 -- | A wrapper for actions/behaviour
 data Action = -- | A basic shell command
               Shell { shName :: T.Text, actBody :: T.Text }
+              -- |
+              | Service { url :: T.Text, method :: T.Text, body :: T.Text }
               -- | Nothing is declared
               | Undefined
-              deriving (Eq, Show)
+              deriving (Eq, Show, Generic)
 
 
 -- | Wraps the result of (attempting) an action
-data ActionResult =
-                   -- | The action succeded
-                   Success T.Text
-                  -- | The action did not execute
-                  | Failure T.Text
-  deriving (Eq, Show)
-
--- | A wrapper for a process and its in, out and error handles
-data Process = Process Handle Handle Handle ProcessHandle
+data ActionResult = -- | The action succeded
+                    Success T.Text
+                    -- | The action did not execute
+                    | Failure T.Text
+                    deriving (Eq, Show)
 
 -- | A descriptor of a cause and some associated action expressions
 data Statement = Temporal Frequency Schedule [(Action, Char)]
@@ -93,7 +90,6 @@ data Plan = Plan [Statement]
 -- | The default operator if none is supplied
 defaultOperator :: Operator
 defaultOperator = ','
-
 
 -- | An event source descriptor based on time
 data Schedule =

@@ -4,15 +4,23 @@
 -- | The Weave parsing API
 module Weave.Parser (
   TimeUnit (..),
+  ParseResult (..),
 
+  -- | Parsers
   parsePlan,
-  toMillis
+  temporalP,
+  unitP,
+
+  -- | Functions
+  toMillis,
+  supportedUnits
   ) where
 
 import           Control.Applicative  ((<|>))
 import           Data.Attoparsec.Text
 import qualified Data.Text            as T
-import           Prelude              hiding (takeWhile)
+import           Prelude              (error, fail)
+import           Protolude            hiding (option, takeWhile)
 import           Weave
 
 -- | All possible outcomes of an actoin reference parse
@@ -29,11 +37,16 @@ data TimeUnit = Seconds
               | Days
               deriving (Enum, Eq, Show)
 
+data ParseResult = Success Plan
+                 | MalformedPlan T.Text
+
+supportedUnits = ['s', 'm', 'h', 'd']
+
 -- | Parse the entire Plan from the given string
-parsePlan :: T.Text -> Either String Plan
-parsePlan i = wrap $ parseOnly planP i
-  where wrap (Left e) = Left $ "Parse error: " ++ show e -- For testing
-        wrap r        = r
+parsePlan :: T.Text -> ParseResult
+parsePlan = wrap . parseOnly planP
+  where wrap (Left s)  = MalformedPlan $ T.concat ["Parse error: ", T.pack s]
+        wrap (Right p) = Success p
 
 -- | The entire document parser
 planP :: Parser Plan
@@ -85,12 +98,12 @@ unitP :: Parser TimeUnit
 unitP = do
   le <- letter <?> "Unit ctor"
   skipSpace
-  return $ ct le
-  where ct 's' = Seconds
-        ct 'm' = Minutes
-        ct 'h' = Hours
-        ct 'd' = Days
-        ct t   = error $ "Unkown schedule token: " ++ show t
+  ct le
+  where ct 's' = return Seconds
+        ct 'm' = return Minutes
+        ct 'h' = return Hours
+        ct 'd' = return Days
+        ct t   = fail $ "Unknown schedule token: " ++ show t
 
 -- | Parse an action block
 actionBlockP :: Parser Action
@@ -150,8 +163,8 @@ actionReferenceP l = do
     where findDeclared n = filter (byName n) l
           byName n (Shell n' _) = n == n'
           byName _ Undefined    = False
-          summarise i [] = return $ ActionNotFound i
-          summarise i x  = return $ ActionRef i $ head x -- only take the first
+          summarise i []    = return $ ActionNotFound i
+          summarise i (x:_) = return $ ActionRef i x -- only take the first
 
 -- | Represent our @TimeUnit@ as an @Int@
 toMillis :: TimeUnit -> Int

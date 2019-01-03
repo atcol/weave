@@ -4,3 +4,4 @@ action date {
   date >> date.now
 }
 in 2s date
+every 2s date

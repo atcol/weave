@@ -1,13 +1,16 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
 module WeaveSpec ( spec ) where
 
 import           Control.Applicative       ((<$>), (<*>))
 import           Control.Monad.IO.Class    (liftIO)
 import           Control.Monad.Reader      (Reader, asks)
+import qualified Data.Text                 as T
 import           Data.Time.Clock           (NominalDiffTime, UTCTime (..),
                                             diffUTCTime, getCurrentTime)
 import           Debug.Trace               (traceM, traceShow)
+import           Protolude
 import           System.IO.Unsafe          (unsafePerformIO)
 import           System.Random             (RandomGen, newStdGen)
 import           Test.Hspec
@@ -19,7 +22,7 @@ import           Test.QuickCheck.Random
 import           Weave                     (Schedule (..), Weave (..), genTime,
                                             randomSeconds, randomTimeBetween)
 
-data ExampleEnv = ExampleEnv { st :: String, int :: Int } deriving Show
+data ExampleEnv = ExampleEnv { st :: T.Text, int :: Int } deriving Show
 
 instance Arbitrary ExampleEnv where
   arbitrary = ExampleEnv <$> arbitrary <*> arbitrary
@@ -29,16 +32,13 @@ instance Arbitrary Schedule where
     where period = Offset <$> arbitrary
           interval = Window <$> arbitrary <*> arbitrary
 
-instance Arbitrary (IO String) where
+instance Arbitrary (IO T.Text) where
   arbitrary = return (return "Fake IO action")
-
-instance Show (IO a) where
-  show _ = "IO a"
 
 mx :: Int
 mx = 10000
 
-action :: IO String
+action :: IO T.Text
 action = print "Hi!" >> return "Hello"
 
 spec :: Spec
@@ -73,15 +73,15 @@ spec = do
 
     context "interval" $ do
       now <- runIO $ getCurrentTime
-      prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now
+      prop "Runs number of times within a *valid* interval" $ prop_interval_alwaysInRange now >> return ()
 
 prop_interval_alwaysInRange n e sc@(Window st en) ioa =
   intervalRestriction n e sc ==> do
-    times e sc (ioa :: IO String) `shouldNotReturn` return []
+    times e sc (ioa :: IO T.Text) `shouldNotReturn` []
 prop_interval_alwaysInRange n e sc@(Offset ms) ioa =
   (e >= 0) && (e < 6000) && (ms >= 0) ==> do
-    let val = times e sc (ioa :: IO String)
-    val `shouldNotReturn` return []
+    let val = times e sc (ioa :: IO T.Text)
+    val `shouldNotReturn` []
 
 intervalRestriction n e sc@(Window st en) = (n <= st) && (n <= en) && (e < 6000)
 
