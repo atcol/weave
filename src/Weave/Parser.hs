@@ -19,7 +19,7 @@ module Weave.Parser (
 import           Control.Applicative  ((<|>))
 import           Data.Attoparsec.Text
 import qualified Data.Text            as T
-import           Prelude              (error, fail)
+import           Prelude              (error, fail, read)
 import           Protolude            hiding (option, takeWhile)
 import           Weave
 
@@ -70,7 +70,7 @@ inlineOrReferenceP acts = do
 
 -- | Parse the inline action declaration
 inlineBodyP :: Parser Action
-inlineBodyP = Shell "inline" <$> bodyP
+inlineBodyP = Action Shell "inline" <$> bodyP
 
 -- | Parse a frequency and schedule
 temporalP :: Parser (Frequency, Schedule)
@@ -108,15 +108,14 @@ unitP = do
 -- | Parse an action block
 actionBlockP :: Parser Action
 actionBlockP = do
-  blkType <- (many1 letter <?> "Shell action") >>= return . T.pack
+  blkType <- (many1 letter <?> "Shell action")
   skipSpace
   name <- many1 letter >>= return . T.pack
   skipSpace
   bdy <- bodyP
   skipWhile ((==) '\n')
-  con blkType name bdy
-    where con "shell" n b = return $ Shell n b -- FIXME parse other types
-          con t _ _       = fail $ "Unsupported body type " ++ T.unpack t
+  con (read $ T.unpack $ T.toTitle $ T.pack blkType) name bdy
+    where con t n b = return $ Action t n b
 
 -- | Parse a full command body, i.e. between '{' and '}'
 bodyP :: Parser T.Text
@@ -145,7 +144,7 @@ actionExpressionP l = do
   c <- option defaultOperator operatorsP
   f ref c
     where f (ActionRef _ a) c    = return (a, c)
-          f (ActionNotFound i) c = return (Shell i i, c)
+          f (ActionNotFound i) c = return (Action Shell i i, c)
 
 -- | Parse a supported operator
 operatorsP :: Parser Char
@@ -163,8 +162,8 @@ actionReferenceP l = do
   iden <- T.pack <$> many1 letter
   summarise iden (findDeclared iden)
     where findDeclared n = filter (byName n) l
-          byName n (Shell n' _) = n == n'
-          byName _ Undefined    = False
+          byName n (Action _ n' _) = n == n'
+          byName _ Undefined       = False
           summarise i []    = return $ ActionNotFound i
           summarise i (x:_) = return $ ActionRef i x -- only take the first
 

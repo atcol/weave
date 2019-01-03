@@ -13,6 +13,7 @@ module Weave
 
     -- | Data constructors
     Action (..),
+    ActionType (..),
     Frequency (..),
     Operator,
     Plan (..),
@@ -62,11 +63,10 @@ type Operator = Char
 -- | For brevity - the result of an action and the operator to apply
 type ActResOpPair = (ActionResult, Operator)
 
+data ActionType = Shell | Service deriving (Eq, Show, Read)
+
 -- | A wrapper for actions/behaviour
-data Action = -- | A basic shell command
-              Shell { shName :: T.Text, actBody :: T.Text }
-              -- |
-              | Service { url :: T.Text, method :: T.Text, body :: T.Text }
+data Action = Action { actType :: ActionType, actName :: T.Text, actBody :: T.Text }
               -- | Nothing is declared
               | Undefined
               deriving (Eq, Show, Generic)
@@ -203,7 +203,7 @@ runPlan (Plan x)  = mapM_ statementToProcess x -- map (sequence . statementToPro
 -- | Prepare  @Statement@ to a list of processes and their operators
 statementToProcess :: Statement -> IO ()
 statementToProcess (Temporal q s []) =
-  statementToProcess (Temporal q s [(Shell "inline" "", defaultOperator)]) --FIXME ensure actionless parsing works
+  statementToProcess (Temporal q s [(Action Shell "inline" "", defaultOperator)]) --FIXME ensure actionless parsing works
 statementToProcess (Temporal q s (x:xs)) = runSchedule q s (runEffect $ for (asProducer x >-> pipes xs) (rawPrint . fst)) >> return ()
   where rawPrint (Success r) = lift $ putStrLn $ T.unpack r
         rawPrint (Failure r) = lift $ putStrLn $ "Error:" ++ T.unpack r
@@ -221,7 +221,7 @@ asPipe (a, opr) p = p >-> do
 
 -- | Convert the @Action@ to a @Producer@
 asProducer :: (Action, Operator) -> Producer ActResOpPair IO ()
-asProducer ((Shell n b), op) = do
+asProducer ((Action Shell n b), op) = do
   (c, o, e) <- liftIO $ readCreateProcessWithExitCode (shell (T.unpack b)){ std_out = CreatePipe } ""
   case c of
     ExitFailure ec -> yield (Failure $ T.concat ["Action ", n, " failed with code: ", T.pack $ show ec, T.pack e], op)
@@ -229,7 +229,7 @@ asProducer ((Shell n b), op) = do
       yield (Success (T.pack o), op)
 
 pipeProcs :: ActResOpPair -> Action -> IO ActResOpPair
-pipeProcs ((Success r, opr)) (Shell n b) = do
+pipeProcs ((Success r, opr)) (Action Shell n b) = do
   case opr of
     '|' -> chain
     '&' -> chain
