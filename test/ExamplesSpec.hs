@@ -28,10 +28,6 @@ spec = do
       it "Operators" $
         runTest "./examples/valid/operators" validOffset
 
-    context "Invalid examples" $ do
-      it "Fails with a parse error" $
-        runTest "examples/invalid" emptyParse
-
 getExamples :: FilePath -> IO [T.Text]
 getExamples p = getDirectoryContents p
   >>= filterM (return . isWeaveFile)
