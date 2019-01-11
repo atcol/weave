@@ -21,33 +21,21 @@ module Weave.Types (
     Plan (..),
     Schedule (..),
     Statement (..),
+    Service (..),
 
     defaultOperator,
 
   ) where
 
-import           Control.Concurrent     (threadDelay)
-import           Control.Monad          (forever, replicateM)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Data.Bifunctor         (first)
-import qualified Data.Text              as T
-import qualified Data.Text.IO           as TI
-import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
-                                         diffUTCTime, getCurrentTime)
+import           Data.Aeson      (FromJSON (..))
+import           Data.Bifunctor  (first)
+import qualified Data.Text       as T
+import qualified Data.Text.IO    as TI
+import           Data.Time.Clock (UTCTime)
 import           GHC.Generics
-import           GHC.IO.Handle          (Handle, hGetContents)
-import           GHC.IO.Handle.FD       (stdin, stdout)
-import           Pipes                  (Consumer, Pipe, Producer, await, cat,
-                                         for, lift, runEffect, yield, (>->))
-import qualified Pipes.Prelude          as P
-import           Prelude                (error)
-import           Protolude              hiding (diff, for)
-import           System.Exit            (ExitCode (..))
-import           System.Process         (CreateProcess (..), ProcessHandle (..),
-                                         StdStream (..), createProcess_,
-                                         readCreateProcessWithExitCode, shell)
-import           System.Random          (Random (..), RandomGen, newStdGen,
-                                         randomR)
+import           Prelude         (error)
+import           Protolude       hiding (diff, for)
+import           System.Random   (Random (..), RandomGen, randomR)
 
 -- | An operator for deciding what to do with action results, where:
 --  - , means "ignore"
@@ -72,6 +60,12 @@ data ActionResult = -- | The action succeded
                     | Failure T.Text
                     deriving (Eq, Show)
 
+-- | A payload for parsed service bodies
+data Service = HttpService { url :: Text, method :: Maybe Text, headers :: [(Text, Text)], body :: Maybe Text }
+  deriving (Show, Eq, Generic)
+
+instance FromJSON Service
+
 -- | A descriptor of a cause and some associated action expressions
 data Statement = Temporal Frequency Schedule [(Action, Char)]
   deriving (Eq, Show)
@@ -80,11 +74,11 @@ data Statement = Temporal Frequency Schedule [(Action, Char)]
 data Plan = Plan [Statement]
   deriving (Show)
 --
--- | The default operator if none is supplied
+-- | The default operator if one isn't supplied
 defaultOperator :: Operator
 defaultOperator = ','
 
--- | An event source descriptor based on time
+-- | An temporal event
 data Schedule =
   -- | A point in the future, in ms
   Offset Int

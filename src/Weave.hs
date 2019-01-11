@@ -29,28 +29,32 @@ module Weave
     runPlan
     ) where
 
-import           Control.Concurrent     (threadDelay)
-import           Control.Monad          (forever, replicateM)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Data.Bifunctor         (first)
-import qualified Data.Text              as T
-import qualified Data.Text.IO           as TI
-import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
-                                         diffUTCTime, getCurrentTime)
+import           Control.Concurrent      (threadDelay)
+import           Control.Monad           (forever, replicateM)
+import           Control.Monad.IO.Class  (MonadIO, liftIO)
+import           Data.Aeson              (eitherDecode)
+import           Data.Bifunctor          (first)
+import           Data.String.Conversions (cs)
+import qualified Data.Text               as T
+import qualified Data.Text.IO            as TI
+import           Data.Time.Clock         (NominalDiffTime, UTCTime, addUTCTime,
+                                          diffUTCTime, getCurrentTime)
 import           GHC.Generics
-import           GHC.IO.Handle          (Handle, hGetContents)
-import           GHC.IO.Handle.FD       (stdin, stdout)
-import           Pipes                  (Consumer, Pipe, Producer, await, cat,
-                                         for, lift, runEffect, yield, (>->))
-import qualified Pipes.Prelude          as P
-import           Prelude                (error)
-import           Protolude              hiding (diff, for)
-import           System.Exit            (ExitCode (..))
-import           System.Process         (CreateProcess (..), ProcessHandle (..),
-                                         StdStream (..), createProcess_,
-                                         readCreateProcessWithExitCode, shell)
-import           System.Random          (Random (..), RandomGen, newStdGen,
-                                         randomR)
+import           GHC.IO.Handle           (Handle, hGetContents)
+import           GHC.IO.Handle.FD        (stdin, stdout)
+import           Pipes                   (Consumer, Pipe, Producer, await, cat,
+                                          for, lift, runEffect, yield, (>->))
+import qualified Pipes.Prelude           as P
+import           Prelude                 (error)
+import           Protolude               hiding (diff, for)
+import           System.Exit             (ExitCode (..))
+import           System.Process          (CreateProcess (..),
+                                          ProcessHandle (..), StdStream (..),
+                                          createProcess_,
+                                          readCreateProcessWithExitCode, shell)
+import           System.Random           (Random (..), RandomGen, newStdGen,
+                                          randomR)
+import           Weave.Network.HTTP
 import           Weave.Types
 
 -- | For brevity - the result of an action and the operator to apply
@@ -153,8 +157,7 @@ asProducer ((Action Shell n b), op) = do
   (c, o, e) <- liftIO $ readCreateProcessWithExitCode (shell (T.unpack b)){ std_out = CreatePipe } ""
   case c of
     ExitFailure ec -> yield (Failure $ T.concat ["Action ", n, " failed with code: ", T.pack $ show ec, T.pack e], op)
-    ExitSuccess -> do
-      yield (Success (T.pack o), op)
+    ExitSuccess -> yield (Success (T.pack o), op)
 
 pipeProcs :: ActResOpPair -> Action -> IO ActResOpPair
 pipeProcs ((Success r, opr)) a@(Action _ n b) = do
@@ -162,8 +165,15 @@ pipeProcs ((Success r, opr)) a@(Action _ n b) = do
   where wrapS ot = return (Success ot, opr)
 pipeProcs r@(Failure _, _) _ = return r
 
+-- | Handle the next action, given the previous operator and the result of the last action
 handleAct :: Operator -> T.Text -> Action -> IO T.Text
-handleAct '|' r (Action Service n b) = undefined
+handleAct '|' r (Action Service n b) = do
+  -- Delay JSON parsing so we can use templates later
+  case eitherDecode (cs $ "{" ++ (cs b) ++ "}") of
+    Left e                           -> error $ "Invalid service body: " ++ e
+    Right (HttpService u (Just m) h b) -> http u m h b
+    Right (HttpService u Nothing h b)  -> http u "POST" h b
+
 handleAct ',' r (Action Shell n b) = do
   (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
         >>= (\(_,o,_,_) -> return o)
