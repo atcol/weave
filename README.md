@@ -45,16 +45,16 @@ The BNF can be see in the `weave.bnf` file, but generally the form for the DSL i
 
 where `trigger` is the schedule or spatial specification, and `action-list` is
 a list of declared actions, an in-line action (`{ ssh server -c "apt-get update" }`)
-or a shell expression (`'blah | grep | tail -1`) to run, delimited by an operator.
+or a references to (un)declared actions (`'blah | grep | tail -1`) to execute, delimited by an operator.
 
 ### Operators
 
 The delimiter for the action list supports basic bash-like operators:
 
- * `|`
- * `&&`
- * `||`
- * ``
+ * `|` - like bash's pipe operator
+ * `&&` - bitwise AND (not implemented yet)
+ * `||` - bitwise OR (not implemented yet)
+ * `,` - sequence, i.e. just run the commands in sequence
 
 ## Examples
 
