@@ -2,7 +2,7 @@
 
 # weave
 
-An API, CLI and DSL for event generation & (un)predictable scheduling.
+A DSL for event generation and uniform integration.
 
 ## Motivation
 
