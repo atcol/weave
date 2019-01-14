@@ -20,7 +20,9 @@ library
                      , async
                      , aeson
                      , attoparsec
+                     , case-insensitive
                      , http-client
+                     , http-client-tls
                      , http-types
                      , mtl
                      , pipes

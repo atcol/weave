@@ -158,6 +158,9 @@ asProducer ((Action Shell n b), op) = do
   case c of
     ExitFailure ec -> yield (Failure $ T.concat ["Action ", n, " failed with code: ", T.pack $ show ec, T.pack e], op)
     ExitSuccess -> yield (Success (T.pack o), op)
+asProducer ((Action Service n b), op) = do
+  r <- liftIO (runService b)
+  yield (Success r, op)
 
 pipeProcs :: ActResOpPair -> Action -> IO ActResOpPair
 pipeProcs ((Success r, opr)) a@(Action _ n b) = do
@@ -167,12 +170,7 @@ pipeProcs r@(Failure _, _) _ = return r
 
 -- | Handle the next action, given the previous operator and the result of the last action
 handleAct :: Operator -> T.Text -> Action -> IO T.Text
-handleAct '|' r (Action Service n b) = do
-  -- Delay JSON parsing so we can use templates later
-  case eitherDecode (cs $ "{" ++ (cs b) ++ "}") of
-    Left e                           -> error $ "Invalid service body: " ++ e
-    Right (HttpService u (Just m) h b) -> http u m h b
-    Right (HttpService u Nothing h b)  -> http u "POST" h b
+handleAct '|' r (Action Service n b) = runService b
 
 handleAct ',' r (Action Shell n b) = do
   (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
@@ -185,3 +183,11 @@ handleAct '|' r (Action Shell n b) = do
   hPutStr ip (T.unpack r)
   hGetContents op >>= return . T.pack
 handleAct o _ (Action _ n _) = error $ "Unsupported operator " ++ show o ++ " for action " ++ T.unpack n
+
+runService :: T.Text -> IO T.Text
+runService b = do
+  -- Delay JSON parsing so we can use templates later
+  case eitherDecode (cs $ "{" ++ (cs b) ++ "}") of
+    Left e                           -> error $ "Invalid service body: " ++ e
+    Right (HttpService u (Just m) h b) -> http u m h b
+    Right (HttpService u Nothing h b)  -> http u "GET" h b
