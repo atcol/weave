@@ -121,10 +121,6 @@ actionBlockP = do
 -- | Parse a full body, i.e. between '{' and '}'
 bodyP :: Parser T.Text
 bodyP = do
-  -- op <- (char '{' <?> "Open brace") <|>
-  --       (char '@' <?> "URL") <|>
-  --       (char ':' <?> "Plain text")
-  -- skipSpace
   op <- peekChar'
   skipSpace
 

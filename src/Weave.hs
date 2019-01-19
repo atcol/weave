@@ -34,7 +34,6 @@ import           Control.Monad           (forever, replicateM)
 import           Control.Monad.IO.Class  (MonadIO, liftIO)
 import           Data.Aeson              (eitherDecode)
 import           Data.Bifunctor          (first)
-import           Data.Maybe              (maybe)
 import           Data.String.Conversions (cs)
 import qualified Data.Text               as T
 import qualified Data.Text.IO            as TI
@@ -147,10 +146,12 @@ pipes xs = foldr asPipe cat xs
 
 -- | A folding operator for an action and the previous pipe
 asPipe :: (Action, Operator) -> Pipe ActResOpPair ActResOpPair IO () -> Pipe ActResOpPair ActResOpPair IO ()
-asPipe (a, opr) p = p >-> do
+asPipe (a, _) p = p >-> do
   o <- await
-  re <- liftIO $ handleResult o a
+  re <- liftIO $ handleResult o
   yield re
+    where handleResult (Success r, opr) = handleAct opr r a >>= \o' -> return (Success o', opr)
+          handleResult r                 = return r
 
 -- | Convert the @Action@ to a @Producer@
 asProducer :: (Action, Operator) -> Producer ActResOpPair IO ()
@@ -163,16 +164,11 @@ asProducer ((Action Service n b), op) = do
   r <- liftIO (runService b Nothing)
   yield (Success r, op)
 
-handleResult :: ActResOpPair -> Action -> IO ActResOpPair
-handleResult (Success r, opr) a@(Action _ n b) = handleAct opr r a >>= wrapS
-  where wrapS ot = return (Success ot, opr)
-handleResult r _ = return r
-
 -- | Handle the next action, given the previous operator and the result of the last action
 handleAct :: Operator -> T.Text -> Action -> IO T.Text
-handleAct '|' r (Action Service n b) = runService b $ Just r
+handleAct '|' r (Action Service _ b) = runService b $ Just r
 
-handleAct ',' r (Action Shell n b) = do
+handleAct ',' _ (Action Shell n b) = do
   (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
         >>= (\(_,o,_,_) -> return o)
   hGetContents op >>= return . T.pack
@@ -190,7 +186,4 @@ runService b i = do
   -- Delay JSON parsing so we can use templates later
   case eitherDecode (cs $ "{" ++ (cs b) ++ "}") of
     Left e                           -> error $ "Invalid service body: " ++ e
-    Right (HttpService u (Just m) h Nothing) -> http u m h i
-    Right (HttpService u Nothing h Nothing)  -> http u "GET" h i
-    -- FIXME handle bodies in the descriptor
-
+    Right (HttpService u m h mb)  -> http u (fromMaybe "GET" m) h (head $ catMaybes [i, mb, Just ""])
