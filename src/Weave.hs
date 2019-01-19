@@ -148,9 +148,7 @@ pipes xs = foldr asPipe cat xs
 -- | A folding operator for an action and the previous pipe
 asPipe :: (Action, Operator) -> Pipe ActResOpPair ActResOpPair IO () -> Pipe ActResOpPair ActResOpPair IO ()
 asPipe (a, opr) p = p >-> do
-  liftIO $ print $ "Pipe " ++ show a ++ " waiting"
   o <- await
-  liftIO $ print $ "Pipe " ++ show a ++ " received " ++ show o
   re <- liftIO $ handleResult o a
   yield re
 
@@ -162,9 +160,7 @@ asProducer ((Action Shell n b), op) = do
     ExitFailure ec -> yield (Failure $ T.concat ["Action ", n, " failed with code: ", T.pack $ show ec, T.pack e], op)
     ExitSuccess -> yield (Success (T.pack o), op)
 asProducer ((Action Service n b), op) = do
-  print $ "Producing " ++ show n
   r <- liftIO (runService b Nothing)
-  liftIO $ print $ "Yielding for " ++ show n ++ ": " ++ show r
   yield (Success r, op)
 
 handleResult :: ActResOpPair -> Action -> IO ActResOpPair
