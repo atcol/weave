@@ -186,4 +186,4 @@ runService b i = do
   -- Delay JSON parsing so we can use templates later
   case eitherDecode (cs $ "{" ++ (cs b) ++ "}") of
     Left e                           -> error $ "Invalid service body: " ++ e
-    Right (HttpService u m h mb)  -> http u (fromMaybe "GET" m) h (head $ catMaybes [i, mb, Just ""])
+    Right (ServiceDescriptor u m h mb)  -> http u (fromMaybe "GET" m) h (head $ catMaybes [i, mb, Just ""])

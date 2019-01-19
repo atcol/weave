@@ -62,7 +62,7 @@ data ActionResult = -- | The action succeded
                     deriving (Eq, Show)
 
 -- | A payload for parsed service bodies
-data ServiceDescriptor = HttpService { url :: Text, method :: Maybe Text, headers :: HashMap Text Text, body :: Maybe Text }
+data ServiceDescriptor = ServiceDescriptor { url :: Text, method :: Maybe Text, headers :: HashMap Text Text, body :: Maybe Text }
   deriving (Show, Eq, Generic)
 
 instance FromJSON ServiceDescriptor
