@@ -17,7 +17,7 @@ import           Weave           as W
 import           Weave.Parser    as WP
 
 -- | A configuration type
-data Session = Session { filename :: Maybe FilePath , raw :: Maybe T.Text }
+data Session = Session { file :: Maybe FilePath , raw :: Maybe T.Text }
   deriving (Show, Generic)
 
 instance ParseRecord Session

@@ -16,11 +16,12 @@ module Weave.Parser (
   supportedUnits
   ) where
 
-import           Control.Applicative  ((<|>))
+import           Control.Applicative     ((<|>))
 import           Data.Attoparsec.Text
-import qualified Data.Text            as T
-import           Prelude              (error, fail, read)
-import           Protolude            hiding (option, takeWhile)
+import           Data.String.Conversions (cs)
+import qualified Data.Text               as T
+import           Prelude                 (error, fail, read)
+import           Protolude               hiding (option, takeWhile)
 import           Weave
 
 -- | All possible outcomes of an actoin reference parse
@@ -108,7 +109,7 @@ unitP = do
 -- | Parse an action block
 actionBlockP :: Parser Action
 actionBlockP = do
-  blkType <- (many1 letter <?> "Shell action")
+  blkType <- (many1 letter <?> "Action type")
   skipSpace
   name <- many1 letter >>= return . T.pack
   skipSpace
@@ -117,21 +118,23 @@ actionBlockP = do
   con (read $ T.unpack $ T.toTitle $ T.pack blkType) name bdy
     where con t n b = return $ Action t n b
 
--- | Parse a full command body, i.e. between '{' and '}'
+-- | Parse a full body, i.e. between '{' and '}'
 bodyP :: Parser T.Text
 bodyP = do
-  op <- (char '{' <?> "Open brace") <|>
-        (char '@' <?> "URL") <|>
-        (char ':' <?> "Plain text")
+  -- op <- (char '{' <?> "Open brace") <|>
+  --       (char '@' <?> "URL") <|>
+  --       (char ':' <?> "Plain text")
+  -- skipSpace
+  op <- peekChar'
   skipSpace
-  -- Will this fail on embedded } ?
-  res <- takeWhile (/= (inverse op)) <?> "Body contents"
-  skipMany (char $ inverse op)
-  return res
-    where inverse '{' = '}'
-          inverse '@' = '\n'
-          inverse ':' = '\n'
-          inverse c   = error $ "Unknown body enclosing character: " ++ show c
+
+  res <- (char op) *> manyTill anyChar (inverse op) <?> "Body"
+
+  return $ T.pack res
+    where inverse '{' = char '}' *> endOfLine *> endOfLine
+          inverse '@' = endOfLine
+          inverse ':' = endOfLine
+          inverse c   = fail $ "Unknown body enclosing character: " ++ show c
 
 -- | Parse many action expressions
 actionExpressionsP :: [Action] -> Parser [(Action, Char)]

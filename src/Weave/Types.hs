@@ -21,21 +21,22 @@ module Weave.Types (
     Plan (..),
     Schedule (..),
     Statement (..),
-    Service (..),
+    ServiceDescriptor (..),
 
     defaultOperator,
 
   ) where
 
-import           Data.Aeson      (FromJSON (..))
-import           Data.Bifunctor  (first)
-import qualified Data.Text       as T
-import qualified Data.Text.IO    as TI
-import           Data.Time.Clock (UTCTime)
+import           Data.Aeson          (FromJSON (..))
+import           Data.Bifunctor      (first)
+import           Data.HashMap.Strict (HashMap)
+import qualified Data.Text           as T
+import qualified Data.Text.IO        as TI
+import           Data.Time.Clock     (UTCTime)
 import           GHC.Generics
-import           Prelude         (error)
-import           Protolude       hiding (diff, for)
-import           System.Random   (Random (..), RandomGen, randomR)
+import           Prelude             (error)
+import           Protolude           hiding (diff, for)
+import           System.Random       (Random (..), RandomGen, randomR)
 
 -- | An operator for deciding what to do with action results, where:
 --  - , means "ignore"
@@ -61,10 +62,10 @@ data ActionResult = -- | The action succeded
                     deriving (Eq, Show)
 
 -- | A payload for parsed service bodies
-data Service = HttpService { url :: Text, method :: Maybe Text, headers :: [(Text, Text)], body :: Maybe Text }
+data ServiceDescriptor = HttpService { url :: Text, method :: Maybe Text, headers :: HashMap Text Text, body :: Maybe Text }
   deriving (Show, Eq, Generic)
 
-instance FromJSON Service
+instance FromJSON ServiceDescriptor
 
 -- | A descriptor of a cause and some associated action expressions
 data Statement = Temporal Frequency Schedule [(Action, Char)]

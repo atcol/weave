@@ -11,7 +11,7 @@ module Weave
     -- | Typeclasses
     Weave (..),
 
-    -- | Data constructors
+    -- | Types
     Action (..),
     ActionType (..),
     Frequency (..),
@@ -34,6 +34,7 @@ import           Control.Monad           (forever, replicateM)
 import           Control.Monad.IO.Class  (MonadIO, liftIO)
 import           Data.Aeson              (eitherDecode)
 import           Data.Bifunctor          (first)
+import           Data.Maybe              (maybe)
 import           Data.String.Conversions (cs)
 import qualified Data.Text               as T
 import qualified Data.Text.IO            as TI
@@ -45,7 +46,7 @@ import           GHC.IO.Handle.FD        (stdin, stdout)
 import           Pipes                   (Consumer, Pipe, Producer, await, cat,
                                           for, lift, runEffect, yield, (>->))
 import qualified Pipes.Prelude           as P
-import           Prelude                 (error)
+import           Prelude                 (error, id)
 import           Protolude               hiding (diff, for)
 import           System.Exit             (ExitCode (..))
 import           System.Process          (CreateProcess (..),
@@ -147,8 +148,10 @@ pipes xs = foldr asPipe cat xs
 -- | A folding operator for an action and the previous pipe
 asPipe :: (Action, Operator) -> Pipe ActResOpPair ActResOpPair IO () -> Pipe ActResOpPair ActResOpPair IO ()
 asPipe (a, opr) p = p >-> do
+  liftIO $ print $ "Pipe " ++ show a ++ " waiting"
   o <- await
-  re <- liftIO $ pipeProcs o a
+  liftIO $ print $ "Pipe " ++ show a ++ " received " ++ show o
+  re <- liftIO $ handleResult o a
   yield re
 
 -- | Convert the @Action@ to a @Producer@
@@ -159,18 +162,19 @@ asProducer ((Action Shell n b), op) = do
     ExitFailure ec -> yield (Failure $ T.concat ["Action ", n, " failed with code: ", T.pack $ show ec, T.pack e], op)
     ExitSuccess -> yield (Success (T.pack o), op)
 asProducer ((Action Service n b), op) = do
-  r <- liftIO (runService b)
+  print $ "Producing " ++ show n
+  r <- liftIO (runService b Nothing)
+  liftIO $ print $ "Yielding for " ++ show n ++ ": " ++ show r
   yield (Success r, op)
 
-pipeProcs :: ActResOpPair -> Action -> IO ActResOpPair
-pipeProcs ((Success r, opr)) a@(Action _ n b) = do
-  (liftIO $ handleAct opr r a) >>= wrapS
+handleResult :: ActResOpPair -> Action -> IO ActResOpPair
+handleResult (Success r, opr) a@(Action _ n b) = handleAct opr r a >>= wrapS
   where wrapS ot = return (Success ot, opr)
-pipeProcs r@(Failure _, _) _ = return r
+handleResult r _ = return r
 
 -- | Handle the next action, given the previous operator and the result of the last action
 handleAct :: Operator -> T.Text -> Action -> IO T.Text
-handleAct '|' r (Action Service n b) = runService b
+handleAct '|' r (Action Service n b) = runService b $ Just r
 
 handleAct ',' r (Action Shell n b) = do
   (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
@@ -184,10 +188,13 @@ handleAct '|' r (Action Shell n b) = do
   hGetContents op >>= return . T.pack
 handleAct o _ (Action _ n _) = error $ "Unsupported operator " ++ show o ++ " for action " ++ T.unpack n
 
-runService :: T.Text -> IO T.Text
-runService b = do
+-- | Parse the service descriptor & run it with the given input
+runService :: T.Text -> Maybe T.Text -> IO T.Text
+runService b i = do
   -- Delay JSON parsing so we can use templates later
   case eitherDecode (cs $ "{" ++ (cs b) ++ "}") of
     Left e                           -> error $ "Invalid service body: " ++ e
-    Right (HttpService u (Just m) h b) -> http u m h b
-    Right (HttpService u Nothing h b)  -> http u "GET" h b
+    Right (HttpService u (Just m) h Nothing) -> http u m h i
+    Right (HttpService u Nothing h Nothing)  -> http u "GET" h i
+    -- FIXME handle bodies in the descriptor
+

@@ -28,10 +28,10 @@ spec = do
       it "Operators" $
         runTest "./examples/operators" validOffset
 
-getExamples :: FilePath -> IO [T.Text]
+getExamples :: FilePath -> IO [(FilePath, T.Text)]
 getExamples p = getDirectoryContents p
   >>= filterM (return . isWeaveFile)
-  >>= mapM (T.readFile . absPath)
+  >>= mapM (\f -> (T.readFile $ absPath f) >>= (\r -> return (f, r)))
     where isWeaveFile = isSuffixOf ".weave"
           absPath f = p ++ "/" ++ f
 
@@ -66,5 +66,5 @@ runTest p f = do
   exs <- getExamples p
   length exs `shouldNotBe` 0
   forM_ exs (\ex -> do
-    print $ "Testing (" ++ p ++ "): " ++ show ex
-    f p $ parsePlan ex)
+    print $ "Testing (" ++ fst ex ++ "): " ++ (show $ snd ex)
+    f p $ parsePlan $ snd ex)
