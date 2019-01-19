@@ -30,7 +30,7 @@ where
 
 
 {- $copyright
-  Copyright 2017, 2018 - Alex Collins.
+  Copyright 2017, 2018, 2019 - Alex Collins.
 
   This tutorial is licensed under a
   <http://creativecommons.org/licenses/by/4.0/ Creative Commons Attribution 4.0 International License>

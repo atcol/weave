@@ -3,5 +3,6 @@ shell date {
   sleep 2
   date >> date.now
 }
+
 in 2s date
 every 2s date

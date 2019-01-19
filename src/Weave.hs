@@ -11,8 +11,9 @@ module Weave
     -- | Typeclasses
     Weave (..),
 
-    -- | Data constructors
+    -- | Types
     Action (..),
+    ActionType (..),
     Frequency (..),
     Operator,
     Plan (..),
@@ -28,105 +29,36 @@ module Weave
     runPlan
     ) where
 
-import           Control.Concurrent     (threadDelay)
-import           Control.Monad          (forever, replicateM)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Reader   (Reader, runReader)
-import           Data.Bifunctor         (first)
-import qualified Data.Text              as T
-import qualified Data.Text.IO           as TI
-import           Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime,
-                                         diffUTCTime, getCurrentTime)
+import           Control.Concurrent      (threadDelay)
+import           Control.Monad           (forever, replicateM)
+import           Control.Monad.IO.Class  (MonadIO, liftIO)
+import           Data.Aeson              (eitherDecode)
+import           Data.Bifunctor          (first)
+import           Data.String.Conversions (cs)
+import qualified Data.Text               as T
+import qualified Data.Text.IO            as TI
+import           Data.Time.Clock         (NominalDiffTime, UTCTime, addUTCTime,
+                                          diffUTCTime, getCurrentTime)
 import           GHC.Generics
-import           GHC.IO.Handle          (Handle, hGetContents)
-import           GHC.IO.Handle.FD       (stdin, stdout)
-import           Pipes                  (Consumer (..), Pipe (..),
-                                         Producer (..), await, cat, for, lift,
-                                         runEffect, yield, (>->))
-import qualified Pipes.Prelude          as P
-import           Protolude              hiding (diff, for)
-import           System.Exit            (ExitCode (..))
-import           System.Process         (CreateProcess (..), ProcessHandle (..),
-                                         StdStream (..), createProcess_,
-                                         readCreateProcessWithExitCode, shell)
-import           System.Random          (Random (..), RandomGen, newStdGen,
-                                         randomR)
-
--- | An operator for deciding what to do with action results, where:
---  - , means "ignore"
---  - | is "pipe", just like a unix pipe
---  - & is logical AND
---  - || is logical OR
-type Operator = Char
+import           GHC.IO.Handle           (Handle, hGetContents)
+import           GHC.IO.Handle.FD        (stdin, stdout)
+import           Pipes                   (Consumer, Pipe, Producer, await, cat,
+                                          for, lift, runEffect, yield, (>->))
+import qualified Pipes.Prelude           as P
+import           Prelude                 (error, id)
+import           Protolude               hiding (diff, for)
+import           System.Exit             (ExitCode (..))
+import           System.Process          (CreateProcess (..),
+                                          ProcessHandle (..), StdStream (..),
+                                          createProcess_,
+                                          readCreateProcessWithExitCode, shell)
+import           System.Random           (Random (..), RandomGen, newStdGen,
+                                          randomR)
+import           Weave.Network.HTTP
+import           Weave.Types
 
 -- | For brevity - the result of an action and the operator to apply
 type ActResOpPair = (ActionResult, Operator)
-
--- | A wrapper for actions/behaviour
-data Action = -- | A basic shell command
-              Shell { shName :: T.Text, actBody :: T.Text }
-              -- |
-              | Service { url :: T.Text, method :: T.Text, body :: T.Text }
-              -- | Nothing is declared
-              | Undefined
-              deriving (Eq, Show, Generic)
-
-
--- | Wraps the result of (attempting) an action
-data ActionResult = -- | The action succeded
-                    Success T.Text
-                    -- | The action did not execute
-                    | Failure T.Text
-                    deriving (Eq, Show)
-
--- | A descriptor of a cause and some associated action expressions
-data Statement = Temporal Frequency Schedule [(Action, Char)]
-  deriving (Eq, Show)
-
--- | An execution plan with a trigger type (@Statement@)
-data Plan = Plan [Statement]
-  deriving (Show)
---
--- | The default operator if none is supplied
-defaultOperator :: Operator
-defaultOperator = ','
-
--- | An event source descriptor based on time
-data Schedule =
-  -- | A point in the future, in ms
-  Offset Int
-  -- | A point in the future, as a @UTCTime@
-  | Instant UTCTime
-  -- | A lower & upper time boundary
-  | Window UTCTime UTCTime
-  deriving (Read, Show, Eq, Generic)
-
--- | The amount of times of some "thing", e.g. action, schedule
-data Frequency = Once | Continuous | N Int deriving (Eq, Read, Show)
-
--- | Operations for sourcing events
-class (MonadIO m) => Weave m s where
-
-  -- | Request the next event, where @s@ is the event source descriptor,
-  -- and @m b@ is the event generation action
-  next :: s -> m b -> m b
-
-  -- | Invoke @next@ @Int@ times
-  times :: Int -> s -> m b -> m [b]
-  times n s a = replicateM n (next s a)
-
-  -- | Generate events according to @s@ at most @[1, n]@ times, using the
-  -- supplied random generator
-  atMost :: RandomGen g => Int -> s -> m b -> g -> m (g, [b])
-  atMost n s a g = return (randomR (1, n) g) >>= (\(n', g') -> do
-    v <- times n' s a
-    return (g', v))
-
-  -- | Generate an event, using @s@ as the *lower* bound
-  lower :: s -> m b -> m b
-
-  -- | Generate an event, using @s@ as the *upper* bound
-  upper :: s -> m b -> m b
 
 instance Weave IO Int where
   next = lower
@@ -203,7 +135,7 @@ runPlan (Plan x)  = mapM_ statementToProcess x -- map (sequence . statementToPro
 -- | Prepare  @Statement@ to a list of processes and their operators
 statementToProcess :: Statement -> IO ()
 statementToProcess (Temporal q s []) =
-  statementToProcess (Temporal q s [(Shell "inline" "", defaultOperator)]) --FIXME ensure actionless parsing works
+  statementToProcess (Temporal q s [(Action Shell "inline" "", defaultOperator)]) --FIXME ensure actionless parsing works
 statementToProcess (Temporal q s (x:xs)) = runSchedule q s (runEffect $ for (asProducer x >-> pipes xs) (rawPrint . fst)) >> return ()
   where rawPrint (Success r) = lift $ putStrLn $ T.unpack r
         rawPrint (Failure r) = lift $ putStrLn $ "Error:" ++ T.unpack r
@@ -214,35 +146,44 @@ pipes xs = foldr asPipe cat xs
 
 -- | A folding operator for an action and the previous pipe
 asPipe :: (Action, Operator) -> Pipe ActResOpPair ActResOpPair IO () -> Pipe ActResOpPair ActResOpPair IO ()
-asPipe (a, opr) p = p >-> do
+asPipe (a, _) p = p >-> do
   o <- await
-  re <- liftIO $ pipeProcs o a
+  re <- liftIO $ handleResult o
   yield re
+    where handleResult (Success r, opr) = handleAct opr r a >>= \o' -> return (Success o', opr)
+          handleResult r                 = return r
 
 -- | Convert the @Action@ to a @Producer@
 asProducer :: (Action, Operator) -> Producer ActResOpPair IO ()
-asProducer ((Shell n b), op) = do
+asProducer ((Action Shell n b), op) = do
   (c, o, e) <- liftIO $ readCreateProcessWithExitCode (shell (T.unpack b)){ std_out = CreatePipe } ""
   case c of
     ExitFailure ec -> yield (Failure $ T.concat ["Action ", n, " failed with code: ", T.pack $ show ec, T.pack e], op)
-    ExitSuccess -> do
-      yield (Success (T.pack o), op)
+    ExitSuccess -> yield (Success (T.pack o), op)
+asProducer ((Action Service n b), op) = do
+  r <- liftIO (runService b Nothing)
+  yield (Success r, op)
 
-pipeProcs :: ActResOpPair -> Action -> IO ActResOpPair
-pipeProcs ((Success r, opr)) (Shell n b) = do
-  case opr of
-    '|' -> chain
-    '&' -> chain
-    ',' ->  do
-      (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
-            >>= (\(_,o,_,_) -> return o)
-      liftIO $ hGetContents op >>= wrapS
-    _ -> return (Failure $ T.concat ["Unsupported operator '", T.singleton opr, "'"], opr)
-  where wrapS ot = return (Success (T.pack ot), opr)
-        chain = do
-          (Just ip, Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){
+-- | Handle the next action, given the previous operator and the result of the last action
+handleAct :: Operator -> T.Text -> Action -> IO T.Text
+handleAct '|' r (Action Service _ b) = runService b $ Just r
+
+handleAct ',' _ (Action Shell n b) = do
+  (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
+        >>= (\(_,o,_,_) -> return o)
+  hGetContents op >>= return . T.pack
+handleAct '|' r (Action Shell n b) = do
+  (Just ip, Just op) <- createProcess_ (T.unpack n) (shell (T.unpack b)){
                           std_out = CreatePipe, std_in = CreatePipe }
                 >>= (\(i,o',_,_) -> return (i, o'))
-          liftIO $ hPutStr ip (T.unpack r)
-          liftIO $ hGetContents op >>= wrapS
-pipeProcs r@(Failure _, _) _ = return r
+  hPutStr ip (T.unpack r)
+  hGetContents op >>= return . T.pack
+handleAct o _ (Action _ n _) = error $ "Unsupported operator " ++ show o ++ " for action " ++ T.unpack n
+
+-- | Parse the service descriptor & run it with the given input
+runService :: T.Text -> Maybe T.Text -> IO T.Text
+runService b i = do
+  -- Delay JSON parsing so we can use templates later
+  case eitherDecode (cs $ "{" ++ (cs b) ++ "}") of
+    Left e                           -> error $ "Invalid service body: " ++ e
+    Right (ServiceDescriptor u m h mb)  -> http u (fromMaybe "GET" m) h (head $ catMaybes [i, mb, Just ""])

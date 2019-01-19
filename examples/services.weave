@@ -1,0 +1,11 @@
+service HttpStore {
+    "url": "http://localhost:8080/v1/store/some/thing",
+    "method": "POST",
+    "headers": []
+}
+
+shell Memory {
+  free -m
+}
+
+every 5s Memory | HttpStore

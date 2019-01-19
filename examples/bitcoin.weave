@@ -1,0 +1,17 @@
+service Bitcoin {
+  "url": "https://api.coindesk.com/v1/bpi/currentprice.json",
+  "headers": {}
+}
+
+service HTTPStore {
+  "method": "POST",
+  "url": "https://postman-echo.com/post",
+  "headers": {"Content-Type": "application/json; charset=utf-8"}
+}
+
+shell ToFile {
+  cat > latest.json
+  cat latest.json
+}
+
+in 2s Bitcoin | ToFile | HTTPStore

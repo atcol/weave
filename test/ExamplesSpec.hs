@@ -21,17 +21,17 @@ spec = do
     context "Valid examples" $ do
 
       it "General" $ do
-        runTest "./examples/valid" validOffset
+        runTest "./examples" validOffset
 
-        runTest "./examples/valid/frequency" validFrequency
+        runTest "./examples/frequency" validFrequency
 
       it "Operators" $
-        runTest "./examples/valid/operators" validOffset
+        runTest "./examples/operators" validOffset
 
-getExamples :: FilePath -> IO [T.Text]
+getExamples :: FilePath -> IO [(FilePath, T.Text)]
 getExamples p = getDirectoryContents p
   >>= filterM (return . isWeaveFile)
-  >>= mapM (T.readFile . absPath)
+  >>= mapM (\f -> (T.readFile $ absPath f) >>= (\r -> return (f, r)))
     where isWeaveFile = isSuffixOf ".weave"
           absPath f = p ++ "/" ++ f
 
@@ -39,12 +39,12 @@ validOperator :: FilePath -> ParseResult -> Expectation
 validOperator _ _ = pendingWith "To-do"
 
 validOffset :: FilePath -> ParseResult -> Expectation
-validOffset _ (MalformedPlan l)         = error $ "Parse error: " ++ show l
+validOffset _ (MalformedPlan l)  = error $ "Parse error: " ++ show l
 validOffset _ (Success (Plan s)) = (lengthIs s 1) >>
-  mapM_ (\(Temporal _ sc _) -> sc `shouldNotBe` Offset 0) s
+  mapM_ scheduleIsPositive s
 
 validFrequency :: FilePath -> ParseResult -> Expectation
-validFrequency _ (MalformedPlan l)         = error $ "Parse error: " ++ show l
+validFrequency _ (MalformedPlan l)  = error $ "Parse error: " ++ show l
 validFrequency p (Success (Plan s)) = (lengthIs s 1) >>
   (mapM_ (\(Temporal f _ _) -> f `shouldBe` getFrequency p) s)
   where getFrequency _ = Once --FIXME derive this from the filename
@@ -59,10 +59,12 @@ emptyParse _ (Success (Plan s)) = length s `shouldBe` 0
 lengthIs :: [a] -> Int -> Expectation
 lengthIs x n = length x `shouldBe` n
 
+scheduleIsPositive (Temporal _ (Offset n) _) = n `shouldSatisfy` ((<) 0)
+
 runTest :: FilePath -> ValidationFunction -> Expectation
 runTest p f = do
   exs <- getExamples p
   length exs `shouldNotBe` 0
   forM_ exs (\ex -> do
-    print $ "Testing: " ++ show ex
-    f p $ parsePlan ex)
+    print $ "Testing (" ++ fst ex ++ "): " ++ (show $ snd ex)
+    f p $ parsePlan $ snd ex)

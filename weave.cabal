@@ -15,19 +15,25 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Weave, Weave.Parser, Weave.Tutorial
+  exposed-modules:     Weave, Weave.Parser, Weave.Network.HTTP, Weave.Tutorial, Weave.Types
   build-depends:       base >= 4.7 && < 5
                      , async
                      , aeson
                      , attoparsec
-                     , text
+                     , case-insensitive
+                     , http-client
+                     , http-client-tls
+                     , http-types
                      , mtl
                      , pipes
                      , process
                      , protolude
                      , random
+                     , string-conversions
+                     , text
                      , time
                      , transformers
+                     , unordered-containers
   default-language:    Haskell2010
   default-extensions: NoImplicitPrelude
                       , OverloadedStrings
