@@ -12,8 +12,9 @@ module Weave.Types (
     -- | Typeclasses
     Weave (..),
 
-    -- | Data constructors
+    -- | Constructors
     Action (..),
+    ActionChain (..),
     ActionType (..),
     ActionResult (..),
     Frequency (..),
@@ -116,3 +117,6 @@ class (MonadIO m) => Weave m s where
   -- | Generate an event, using @s@ as the *upper* bound
   upper :: s -> m b -> m b
 
+-- | Run @Action@s with input
+class (IsString s) => ActionChain a s where
+  actOn :: Maybe s -> a -> IO s

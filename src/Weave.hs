@@ -164,20 +164,26 @@ asProducer ((Action Service n b), op) = do
   r <- liftIO (runService b Nothing)
   yield (Success r, op)
 
+instance ActionChain Action Text where
+  actOn r (Action Service _ b)        = runService b r
+  actOn r@(Just _) (Action Shell _ b) = runService b r
+  actOn (Just r) (Action Shell n b) = do
+    (Just ip, Just op) <- createProcess_ (T.unpack n) (shell (T.unpack b)){
+                            std_out = CreatePipe, std_in = CreatePipe }
+                  >>= (\(i,o',_,_) -> return (i, o'))
+    hPutStr ip (T.unpack r)
+    hGetContents op >>= return . T.pack
+  actOn Nothing (Action Shell n b) = do
+    (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
+          >>= (\(_,o,_,_) -> return o)
+    hGetContents op >>= return . T.pack
+
 -- | Handle the next action, given the previous operator and the result of the last action
 handleAct :: Operator -> T.Text -> Action -> IO T.Text
-handleAct '|' r (Action Service _ b) = runService b $ Just r
-
-handleAct ',' _ (Action Shell n b) = do
-  (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
-        >>= (\(_,o,_,_) -> return o)
-  hGetContents op >>= return . T.pack
-handleAct '|' r (Action Shell n b) = do
-  (Just ip, Just op) <- createProcess_ (T.unpack n) (shell (T.unpack b)){
-                          std_out = CreatePipe, std_in = CreatePipe }
-                >>= (\(i,o',_,_) -> return (i, o'))
-  hPutStr ip (T.unpack r)
-  hGetContents op >>= return . T.pack
+handleAct '|' "" a@(Action Service _ _) = actOn Nothing a
+handleAct '|' r a@(Action Service _ _) = actOn (Just r) a
+handleAct '|' r a@(Action Shell _ _) = actOn (Just r) a
+handleAct _ r a@(Action Shell _ _) = actOn Nothing a
 handleAct o _ (Action _ n _) = error $ "Unsupported operator " ++ show o ++ " for action " ++ T.unpack n
 
 -- | Parse the service descriptor & run it with the given input
