@@ -111,15 +111,6 @@ genTime (Window s e) rg = return $ randomTimeBetween s e rg
 diff :: UTCTime -> UTCTime -> NominalDiffTime
 diff = diffUTCTime
 
--- | Delay for a random amount within the schedule
-delayFor :: RandomGen g => Schedule -> g -> IO g
-delayFor sc g = do
-  let (ti, g') = undefined -- <- genTime sc g
-  del <- case sc of
-              Offset _   -> getCurrentTime >>= return . flip getDelay ti
-  threadDelay del
-  return g'
-
 -- | Turn the @UTCTime@ to its microseconds
 getDelay :: UTCTime -> UTCTime -> Int
 getDelay s t = delay
