@@ -19,8 +19,7 @@ import           Test.QuickCheck           hiding (within)
 import           Test.QuickCheck.Instances
 import           Test.QuickCheck.IO        ()
 import           Test.QuickCheck.Random
-import           Weave                     (Schedule (..), Weave (..), genTime,
-                                            randomSeconds, randomTimeBetween)
+import           Weave
 
 data ExampleEnv = ExampleEnv { st :: T.Text, int :: Int } deriving Show
 

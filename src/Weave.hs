@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveFunctor         #-}
-{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -9,7 +8,7 @@
 module Weave
   (
     -- | Typeclasses
-    Weave (..),
+    Evented (..),
 
     -- | Types
     Action (..),
@@ -39,19 +38,15 @@ import qualified Data.Text               as T
 import qualified Data.Text.IO            as TI
 import           Data.Time.Clock         (NominalDiffTime, UTCTime, addUTCTime,
                                           diffUTCTime, getCurrentTime)
-import           GHC.Generics
-import           GHC.IO.Handle           (Handle, hGetContents)
+import           GHC.IO.Handle           (hGetContents)
 import           GHC.IO.Handle.FD        (stdin, stdout)
 import           Pipes                   (Consumer, Pipe, Producer, await, cat,
                                           for, lift, runEffect, yield, (>->))
 import qualified Pipes.Prelude           as P
 import           Prelude                 (error, id)
 import           Protolude               hiding (diff, for)
-import           System.Exit             (ExitCode (..))
-import           System.Process          (CreateProcess (..),
-                                          ProcessHandle (..), StdStream (..),
-                                          createProcess_,
-                                          readCreateProcessWithExitCode, shell)
+import           System.Process          (CreateProcess (..), StdStream (..),
+                                          createProcess_, shell)
 import           System.Random           (Random (..), RandomGen, newStdGen,
                                           randomR)
 import           Weave.Network.HTTP
@@ -60,7 +55,7 @@ import           Weave.Types
 -- | For brevity - the result of an action and the operator to apply
 type ActResOpPair = (ActionResult, Operator)
 
-instance Weave IO Int where
+instance Evented IO Int where
   next = lower
 
   -- | A delay of @ms@ milliseconds before executing @a@
@@ -68,17 +63,17 @@ instance Weave IO Int where
 
   --upper ms a = newStdGen >>= genTime (Offset ms) >>=
 
-instance Weave IO UTCTime where
+instance Evented IO UTCTime where
   -- | A delay of @t - getCurrentTime@  before executing @a@
   next t a = getCurrentTime >>= return . timeDiffSecs >>= (\t' -> next t' a)
     where timeDiffSecs :: UTCTime -> Int
           timeDiffSecs = round . flip diffUTCTime t
 
-instance Weave IO (UTCTime, UTCTime) where
+instance Evented IO (UTCTime, UTCTime) where
   next (s, e) a = newStdGen >>= return . randomTimeBetween s e >>= flip next a . fst
 
 -- | Generate events, parameterised by time
-instance Weave IO Schedule where
+instance Evented IO Schedule where
 
   next (Offset ms) a  = next ms a
   next (Window s e) a = newStdGen >>=
@@ -86,7 +81,7 @@ instance Weave IO Schedule where
     return . fst >>=
     (\t -> next t a)
 
-instance ActionChain Action Text where
+instance Weave Action Text where
   actOn r (Action Service _ b)        = runService b r
   actOn (Just r) (Action Shell n b) = do
     (Just ip, Just op) <- createProcess_ (T.unpack n) (shell (T.unpack b)){

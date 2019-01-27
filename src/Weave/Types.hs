@@ -10,11 +10,10 @@
 -}
 module Weave.Types (
     -- | Typeclasses
-    Weave (..),
+    Evented (..),
 
     -- | Constructors
     Action (..),
-    ActionChain (..),
     ActionType (..),
     ActionResult (..),
     Frequency (..),
@@ -23,19 +22,17 @@ module Weave.Types (
     Schedule (..),
     Statement (..),
     ServiceDescriptor (..),
+    Weave (..),
 
     defaultOperator,
 
   ) where
 
 import           Data.Aeson          (FromJSON (..))
-import           Data.Bifunctor      (first)
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.Text           as T
-import qualified Data.Text.IO        as TI
 import           Data.Time.Clock     (UTCTime)
 import           GHC.Generics
-import           Prelude             (error)
 import           Protolude           hiding (diff, for)
 import           System.Random       (Random (..), RandomGen, randomR)
 
@@ -94,7 +91,7 @@ data Schedule =
 data Frequency = Once | Continuous | N Int deriving (Eq, Read, Show)
 
 -- | Operations for sourcing events
-class (MonadIO m) => Weave m s where
+class (MonadIO m) => Evented m s where
 
   -- | Request the next event, where @s@ is the event source descriptor,
   -- and @m b@ is the event generation action
@@ -118,5 +115,5 @@ class (MonadIO m) => Weave m s where
   upper :: s -> m b -> m b
 
 -- | Run @Action@s with input
-class (IsString s) => ActionChain a s where
+class (IsString s) => Weave a s where
   actOn :: Maybe s -> a -> IO s
