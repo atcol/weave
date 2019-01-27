@@ -115,5 +115,5 @@ class (MonadIO m) => Evented m s where
   upper :: s -> m b -> m b
 
 -- | Run @Action@s with input
-class (IsString s) => Weave a s where
-  actOn :: Maybe s -> a -> IO s
+class Weave a i o where
+  actOn :: a -> Maybe i -> IO o

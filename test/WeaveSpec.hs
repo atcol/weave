@@ -21,11 +21,6 @@ import           Test.QuickCheck.IO        ()
 import           Test.QuickCheck.Random
 import           Weave
 
-data ExampleEnv = ExampleEnv { st :: T.Text, int :: Int } deriving Show
-
-instance Arbitrary ExampleEnv where
-  arbitrary = ExampleEnv <$> arbitrary <*> arbitrary
-
 instance Arbitrary Schedule where
   arbitrary = oneof [interval, period]
     where period = Offset <$> arbitrary

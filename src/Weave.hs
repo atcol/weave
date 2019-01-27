@@ -55,6 +55,10 @@ import           Weave.Types
 -- | For brevity - the result of an action and the operator to apply
 type ActResOpPair = (ActionResult, Operator)
 
+-- | For brevity - ambiguious constraint errors otherwise
+noTextInput :: Maybe T.Text
+noTextInput = Nothing
+
 instance Evented IO Int where
   next = lower
 
@@ -81,15 +85,15 @@ instance Evented IO Schedule where
     return . fst >>=
     (\t -> next t a)
 
-instance Weave Action Text where
-  actOn r (Action Service _ b)        = runService b r
-  actOn (Just r) (Action Shell n b) = do
+instance Weave Action Text Text where
+  actOn (Action Service _ b) r      = runService b r
+  actOn (Action Shell n b) (Just r)  = do
     (Just ip, Just op) <- createProcess_ (T.unpack n) (shell (T.unpack b)){
                             std_out = CreatePipe, std_in = CreatePipe }
                   >>= (\(i,o',_,_) -> return (i, o'))
     hPutStr ip (T.unpack r)
     hGetContents op >>= return . T.pack
-  actOn Nothing (Action Shell n b) = do
+  actOn (Action Shell n b) Nothing = do
     (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
           >>= (\(_,o,_,_) -> return o)
     hGetContents op >>= return . T.pack
@@ -154,14 +158,14 @@ asPipe (a, _) p = p >-> do
 
 -- | Convert the @Action@ to a @Producer@
 asProducer :: (Action, Operator) -> Producer ActResOpPair IO ()
-asProducer (a, op) = liftIO (actOn Nothing a) >>= \o -> yield (Success o, op)
+asProducer (a, op) = liftIO (actOn a noTextInput) >>= \o -> yield (Success o, op)
 
 -- | Handle the next action, given the previous operator and the result of the last action
 handleAct :: Operator -> T.Text -> Action -> IO T.Text
-handleAct '|' "" a@(Action Service _ _) = actOn Nothing a
-handleAct '|' r a@(Action Service _ _) = actOn (Just r) a
-handleAct '|' r a@(Action Shell _ _) = actOn (Just r) a
-handleAct _ _ a@(Action Shell _ _) = actOn Nothing a
+handleAct '|' "" a@(Action Service _ _) = actOn a noTextInput
+handleAct '|' r a@(Action Service _ _) = actOn a (Just r)
+handleAct '|' r a@(Action Shell _ _) = actOn a (Just r)
+handleAct _ _ a@(Action Shell _ _) = actOn a noTextInput
 handleAct o _ (Action _ n _) = error $ "Unsupported operator " ++ show o ++ " for action " ++ T.unpack n
 
 -- | Parse the service descriptor & run it with the given input
