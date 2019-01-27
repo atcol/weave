@@ -86,6 +86,19 @@ instance Weave IO Schedule where
     return . fst >>=
     (\t -> next t a)
 
+instance ActionChain Action Text where
+  actOn r (Action Service _ b)        = runService b r
+  actOn (Just r) (Action Shell n b) = do
+    (Just ip, Just op) <- createProcess_ (T.unpack n) (shell (T.unpack b)){
+                            std_out = CreatePipe, std_in = CreatePipe }
+                  >>= (\(i,o',_,_) -> return (i, o'))
+    hPutStr ip (T.unpack r)
+    hGetContents op >>= return . T.pack
+  actOn Nothing (Action Shell n b) = do
+    (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
+          >>= (\(_,o,_,_) -> return o)
+    hGetContents op >>= return . T.pack
+
 -- | Randomly pick a time compatible with the given schedule
 genTime :: (MonadIO m, RandomGen g) => Schedule -> g -> m (UTCTime, g)
 genTime (Offset ms) rg = do
@@ -155,35 +168,14 @@ asPipe (a, _) p = p >-> do
 
 -- | Convert the @Action@ to a @Producer@
 asProducer :: (Action, Operator) -> Producer ActResOpPair IO ()
-asProducer ((Action Shell n b), op) = do
-  (c, o, e) <- liftIO $ readCreateProcessWithExitCode (shell (T.unpack b)){ std_out = CreatePipe } ""
-  case c of
-    ExitFailure ec -> yield (Failure $ T.concat ["Action ", n, " failed with code: ", T.pack $ show ec, T.pack e], op)
-    ExitSuccess -> yield (Success (T.pack o), op)
-asProducer ((Action Service n b), op) = do
-  r <- liftIO (runService b Nothing)
-  yield (Success r, op)
-
-instance ActionChain Action Text where
-  actOn r (Action Service _ b)        = runService b r
-  actOn r@(Just _) (Action Shell _ b) = runService b r
-  actOn (Just r) (Action Shell n b) = do
-    (Just ip, Just op) <- createProcess_ (T.unpack n) (shell (T.unpack b)){
-                            std_out = CreatePipe, std_in = CreatePipe }
-                  >>= (\(i,o',_,_) -> return (i, o'))
-    hPutStr ip (T.unpack r)
-    hGetContents op >>= return . T.pack
-  actOn Nothing (Action Shell n b) = do
-    (Just op) <- liftIO $ createProcess_ (T.unpack n) (shell (T.unpack b)){ std_out = CreatePipe }
-          >>= (\(_,o,_,_) -> return o)
-    hGetContents op >>= return . T.pack
+asProducer (a, op) = liftIO (actOn Nothing a) >>= \o -> yield (Success o, op)
 
 -- | Handle the next action, given the previous operator and the result of the last action
 handleAct :: Operator -> T.Text -> Action -> IO T.Text
 handleAct '|' "" a@(Action Service _ _) = actOn Nothing a
 handleAct '|' r a@(Action Service _ _) = actOn (Just r) a
 handleAct '|' r a@(Action Shell _ _) = actOn (Just r) a
-handleAct _ r a@(Action Shell _ _) = actOn Nothing a
+handleAct _ _ a@(Action Shell _ _) = actOn Nothing a
 handleAct o _ (Action _ n _) = error $ "Unsupported operator " ++ show o ++ " for action " ++ T.unpack n
 
 -- | Parse the service descriptor & run it with the given input
