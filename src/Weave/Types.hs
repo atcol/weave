@@ -17,7 +17,7 @@ module Weave.Types (
     ActionType (..),
     ActionResult (..),
     Frequency (..),
-    Operator,
+    Operator (..),
     Plan (..),
     Schedule (..),
     Statement (..),
@@ -41,8 +41,9 @@ import           System.Random       (Random (..), RandomGen, randomR)
 --  - | is "pipe", just like a unix pipe
 --  - & is logical AND
 --  - || is logical OR
-type Operator = Char
+data Operator = Sequence | Pipe | And | Or deriving (Show, Eq)
 
+-- | A wrapper for various action blocks/bodies
 data ActionType = Shell | Service deriving (Eq, Show, Read)
 
 -- | A wrapper for actions/behaviour
@@ -66,7 +67,7 @@ data ServiceDescriptor = ServiceDescriptor { url :: Text, method :: Maybe Text, 
 instance FromJSON ServiceDescriptor
 
 -- | A descriptor of a cause and some associated action expressions
-data Statement = Temporal Frequency Schedule [(Action, Char)]
+data Statement = Temporal Frequency Schedule [(Action, Operator)]
   deriving (Eq, Show)
 
 -- | An execution plan with a trigger type (@Statement@)
@@ -75,7 +76,7 @@ data Plan = Plan [Statement]
 --
 -- | The default operator if one isn't supplied
 defaultOperator :: Operator
-defaultOperator = ','
+defaultOperator = Sequence
 
 -- | An temporal event
 data Schedule =

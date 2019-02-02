@@ -62,7 +62,7 @@ statementP acts = do
   Temporal fr s <$> inlineOrReferenceP acts
 
 -- | Parse an inline body or action reference expression
-inlineOrReferenceP :: [Action] -> Parser [(Action, Char)]
+inlineOrReferenceP :: [Action] -> Parser [(Action, Operator)]
 inlineOrReferenceP acts = do
   r <- option Undefined inlineBodyP
   case r of
@@ -133,11 +133,11 @@ bodyP = do
           inverse c   = fail $ "Unknown body enclosing character: " ++ show c
 
 -- | Parse many action expressions
-actionExpressionsP :: [Action] -> Parser [(Action, Char)]
+actionExpressionsP :: [Action] -> Parser [(Action, Operator)]
 actionExpressionsP l = many1 $ actionExpressionP l
 
 -- | Parse the body reference and an operator on its RHS
-actionExpressionP :: [Action] -> Parser (Action, Char)
+actionExpressionP :: [Action] -> Parser (Action, Operator)
 actionExpressionP l = do
   ref <- actionReferenceP l
   c <- option defaultOperator operatorsP
@@ -146,12 +146,15 @@ actionExpressionP l = do
           f (ActionNotFound i) c = return (Action Shell i i, c)
 
 -- | Parse a supported operator
-operatorsP :: Parser Char
+operatorsP :: Parser Operator
 operatorsP = do
   skipSpace
-  c <- char '|' <|> char '&' <|> char ',' <|> char '¬'
+  c <- char '|' <|> char '&' <|> char ','
   skipSpace
-  return c
+  case c of
+    '|' -> return Pipe
+    '&' -> return And
+    ',' -> return Sequence
 
 -- | Parse one body reference (e.g. @action1@ in @action1 | action2@) to an action
 -- and find its action in the given list

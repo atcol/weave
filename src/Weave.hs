@@ -14,7 +14,7 @@ module Weave
     Action (..),
     ActionType (..),
     Frequency (..),
-    Operator,
+    Operator (..),
     Plan (..),
     Schedule (..),
     Statement (..),
@@ -35,7 +35,6 @@ import           Data.Aeson              (eitherDecode)
 import           Data.Bifunctor          (first)
 import           Data.String.Conversions (cs)
 import qualified Data.Text               as T
-import qualified Data.Text.IO            as TI
 import           Data.Time.Clock         (NominalDiffTime, UTCTime, addUTCTime,
                                           diffUTCTime, getCurrentTime)
 import           GHC.IO.Handle           (hGetContents)
@@ -162,9 +161,9 @@ asProducer (a, op) = liftIO (actOn a noTextInput) >>= \o -> yield (Success o, op
 
 -- | Handle the next action, given the previous operator and the result of the last action
 handleAct :: Operator -> T.Text -> Action -> IO T.Text
-handleAct '|' "" a@(Action Service _ _) = actOn a noTextInput
-handleAct '|' r a@(Action Service _ _) = actOn a (Just r)
-handleAct '|' r a@(Action Shell _ _) = actOn a (Just r)
+handleAct Pipe "" a@(Action Service _ _) = actOn a noTextInput
+handleAct Pipe r a@(Action Service _ _) = actOn a (Just r)
+handleAct Pipe r a@(Action Shell _ _) = actOn a (Just r)
 handleAct _ _ a@(Action Shell _ _) = actOn a noTextInput
 handleAct o _ (Action _ n _) = error $ "Unsupported operator " ++ show o ++ " for action " ++ T.unpack n
 
