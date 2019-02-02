@@ -166,6 +166,7 @@ handleAct Pipe r a@(Action Service _ _) = actOn a (Just r)
 handleAct Pipe r a@(Action Shell _ _) = actOn a (Just r)
 handleAct _ _ a@(Action Shell _ _) = actOn a noTextInput
 handleAct o _ (Action _ n _) = error $ "Unsupported operator " ++ show o ++ " for action " ++ T.unpack n
+handleAct _ _ Undefined = error "Undefined action"
 
 -- | Parse the service descriptor & run it with the given input
 runService :: T.Text -> Maybe T.Text -> IO T.Text

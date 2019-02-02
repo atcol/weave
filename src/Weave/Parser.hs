@@ -155,6 +155,7 @@ operatorsP = do
     '|' -> return Pipe
     '&' -> return And
     ',' -> return Sequence
+    o   -> fail $ "Unsupported operator " ++ show o
 
 -- | Parse one body reference (e.g. @action1@ in @action1 | action2@) to an action
 -- and find its action in the given list
