@@ -19,6 +19,8 @@ import           Network.HTTP.Types.Status (statusCode)
 import           Protolude                 hiding (toList)
 import           Weave.Types               hiding (method)
 
+-- | Make a HTTP request,
+--  @http url method headers body@
 http ::  T.Text -> T.Text -> HashMap T.Text T.Text -> Maybe T.Text -> IO T.Text
 http u m h b = do
   manager <- newManager tlsManagerSettings

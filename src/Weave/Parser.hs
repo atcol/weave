@@ -7,7 +7,11 @@ module Weave.Parser (
   ParseResult (..),
 
   -- | Parsers
+  actionExpressionsP,
   parsePlan,
+  planP,
+  importP,
+  statementP,
   temporalP,
   unitP,
 
@@ -16,12 +20,11 @@ module Weave.Parser (
   supportedUnits
   ) where
 
-import           Control.Applicative     ((<|>))
+import           Control.Applicative  ((<|>))
 import           Data.Attoparsec.Text
-import           Data.String.Conversions (cs)
-import qualified Data.Text               as T
-import           Prelude                 (error, fail, read)
-import           Protolude               hiding (option, takeWhile)
+import qualified Data.Text            as T
+import           Prelude              (error, fail, read)
+import           Protolude            hiding (option, takeWhile)
 import           Weave
 
 -- | All possible outcomes of an actoin reference parse
@@ -31,6 +34,9 @@ data ActionRefParseResult = -- | The action reference was not found
                             | ActionRef T.Text Action
                             deriving (Show)
 
+-- | A wrapper for imports of weave files
+data Import = ImportRemote T.Text | ImportRelative T.Text deriving (Show, Eq)
+
 -- | The unit of time supported as Temporal Expressions
 data TimeUnit = Seconds
               | Minutes
@@ -38,13 +44,21 @@ data TimeUnit = Seconds
               | Days
               deriving (Enum, Eq, Show)
 
+-- | The result of parsing a raw weave specification string
 data ParseResult = Success Plan
                  | MalformedPlan T.Text
 
+-- | The abbreviated time unit chars, *s*econds, *m*inutes, etc
+supportedUnits :: [Char]
 supportedUnits = ['s', 'm', 'h', 'd']
 
 -- | Parse the entire Plan from the given string
 parsePlan :: T.Text -> ParseResult
+--parsePlan = do
+--  case r of
+--    Fail i l -> return $ MalformedPlan $ T.concat ["Parse error: ", T.pack s]
+--    Partial c -> feed
+--    Done i r ->
 parsePlan = wrap . parseOnly planP
   where wrap (Left s)  = MalformedPlan $ T.concat ["Parse error: ", T.pack s]
         wrap (Right p) = Success p
@@ -56,10 +70,23 @@ planP = do
   stmts <- many' $ statementP acts
   return $ Plan stmts
 
+-- | A parser for @import RelativePathOrURL@ statements
+importP :: Parser Import
+importP = do
+  _ <- string "import"
+  skipSpace
+  txt <- manyTill anyChar endOfLine <?> "Import path/URL"
+  if (isPrefixOf "./" txt)
+     then return $ ImportRemote $ T.pack txt
+     else return $ ImportRelative $ T.pack txt
+
 statementP :: [Action] -> Parser Statement
 statementP acts = do
   (fr, s) <- temporalP
-  Temporal fr s <$> inlineOrReferenceP acts
+  -- Following fails because the bodyP fails because it just sees action ref
+  t <- Temporal fr s <$> inlineOrReferenceP acts
+  skipSpace
+  return t
 
 -- | Parse an inline body or action reference expression
 inlineOrReferenceP :: [Action] -> Parser [(Action, Operator)]
@@ -78,15 +105,13 @@ temporalP :: Parser (Frequency, Schedule)
 temporalP = do
   (fr, fn) <- scheduleCtorP <?> "Schedule Constructor"
   num <- round <$> double
-  skipSpace
   tu <- unitP <?> "TimeUnit"
-  skipSpace
   return (fr, fn $ num * (toMillis tu))
 
 -- | Parse the schedule string from plain English to its corresponding data constructor
 scheduleCtorP :: Parser (Frequency, (Int -> Schedule))
 scheduleCtorP = do
-  skipWhile ((==) '\n')
+  skipWhile isEndOfLine
   ctorStr <- ((string "every" <?> "every") <|> (string "in" <?> "in")) <?> "Schedule Ctor"
   skipSpace
   case ctorStr of
@@ -123,9 +148,7 @@ bodyP :: Parser T.Text
 bodyP = do
   op <- peekChar'
   skipSpace
-
   res <- (char op) *> manyTill anyChar (inverse op) <?> "Body"
-
   return $ T.pack res
     where inverse '{' = char '}' *> endOfLine *> endOfLine
           inverse '@' = endOfLine
@@ -134,9 +157,13 @@ bodyP = do
 
 -- | Parse many action expressions
 actionExpressionsP :: [Action] -> Parser [(Action, Operator)]
-actionExpressionsP l = many1 $ actionExpressionP l
+actionExpressionsP l = do
+  e <- actionExpressionP l
+  c <- peekChar'
+  if (isEndOfLine c) then return [e]
+                     else ((++) [e]) <$> actionExpressionsP l
 
--- | Parse the body reference and an operator on its RHS
+-- | Parse the action reference and an operator on its RHS
 actionExpressionP :: [Action] -> Parser (Action, Operator)
 actionExpressionP l = do
   ref <- actionReferenceP l

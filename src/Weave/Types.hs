@@ -24,7 +24,7 @@ module Weave.Types (
     ServiceDescriptor (..),
     Weave (..),
 
-    defaultOperator,
+    defaultOperator
 
   ) where
 
@@ -66,6 +66,9 @@ data ServiceDescriptor = ServiceDescriptor { url :: Text, method :: Maybe Text, 
 
 instance FromJSON ServiceDescriptor
 
+-- | The amount of times of some "thing", e.g. action, schedule
+data Frequency = Once | Continuous | N Int deriving (Eq, Read, Show)
+
 -- | A descriptor of a cause and some associated action expressions
 data Statement = Temporal Frequency Schedule [(Action, Operator)]
   deriving (Eq, Show)
@@ -87,9 +90,6 @@ data Schedule =
   -- | A lower & upper time boundary
   | Window UTCTime UTCTime
   deriving (Read, Show, Eq, Generic)
-
--- | The amount of times of some "thing", e.g. action, schedule
-data Frequency = Once | Continuous | N Int deriving (Eq, Read, Show)
 
 -- | Operations for sourcing events
 class (MonadIO m) => Evented m s where

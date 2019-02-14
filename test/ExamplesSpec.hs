@@ -3,13 +3,14 @@
 module ExamplesSpec ( spec ) where
 
 import           Control.Monad    (filterM, forM_, mapM_)
-import           Data.List
+import qualified Data.List        as L
 import qualified Data.Text        as T
 import qualified Data.Text.IO     as T
 import           Prelude          (error)
 import           Protolude
 import           System.Directory
 import           Test.Hspec
+import           Utils
 import           Weave
 import           Weave.Parser     (ParseResult (..), parsePlan)
 
@@ -25,6 +26,18 @@ spec = do
 
         runTest "./examples/frequency" validFrequency
 
+
+      it "Explicit Tests" $ do
+
+        plan <- T.readFile "examples/frequency/multiple.weave" >>= return . parsePlan
+        case plan of
+          MalformedPlan e -> error $ "Parsing shouldn't have failed" ++ show e
+          Success (Plan l) -> do
+            length l `shouldBe` 2
+            head l `shouldSatisfy` (\p -> correctStmt (N 1) (Offset 1000) $ getStmt p)
+              where getStmt (Just s) = s
+                    getStmt _        = error "No plan parsed"
+
       it "Operators" $
         runTest "./examples/operators" validOffset
 
@@ -32,7 +45,7 @@ getExamples :: FilePath -> IO [(FilePath, T.Text)]
 getExamples p = getDirectoryContents p
   >>= filterM (return . isWeaveFile)
   >>= mapM (\f -> (T.readFile $ absPath f) >>= (\r -> return (f, r)))
-    where isWeaveFile = isSuffixOf ".weave"
+    where isWeaveFile = L.isSuffixOf ".weave"
           absPath f = p ++ "/" ++ f
 
 validOperator :: FilePath -> ParseResult -> Expectation

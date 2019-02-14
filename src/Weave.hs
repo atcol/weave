@@ -38,11 +38,9 @@ import qualified Data.Text               as T
 import           Data.Time.Clock         (NominalDiffTime, UTCTime, addUTCTime,
                                           diffUTCTime, getCurrentTime)
 import           GHC.IO.Handle           (hGetContents)
-import           GHC.IO.Handle.FD        (stdin, stdout)
-import           Pipes                   (Consumer, Pipe, Producer, await, cat,
-                                          for, lift, runEffect, yield, (>->))
-import qualified Pipes.Prelude           as P
-import           Prelude                 (error, id)
+import           Pipes                   (Pipe, Producer, await, cat, for, lift,
+                                          runEffect, yield, (>->))
+import           Prelude                 (error)
 import           Protolude               hiding (diff, for)
 import           System.Process          (CreateProcess (..), StdStream (..),
                                           createProcess_, shell)
@@ -173,5 +171,5 @@ runService :: T.Text -> Maybe T.Text -> IO T.Text
 runService b i = do
   -- Delay JSON parsing so we can use templates later
   case eitherDecode (cs $ "{" ++ (cs b) ++ "}") of
-    Left e                           -> error $ "Invalid service body: " ++ e
-    Right (ServiceDescriptor u m h mb)  -> http u (fromMaybe "GET" m) h (head $ catMaybes [i, mb, Just ""])
+    Left e                             -> error $ "Invalid service body: " ++ e
+    Right (ServiceDescriptor u m h mb) -> http u (fromMaybe "GET" m) h (head $ catMaybes [i, mb, Just ""])
