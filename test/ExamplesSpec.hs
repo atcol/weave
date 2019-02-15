@@ -7,6 +7,7 @@ import qualified Data.List        as L
 import qualified Data.Text        as T
 import qualified Data.Text.IO     as T
 import           Prelude          (error)
+import           Prelude          (last)
 import           Protolude
 import           System.Directory
 import           Test.Hspec
@@ -26,7 +27,6 @@ spec = do
 
         runTest "./examples/frequency" validFrequency
 
-
       it "Explicit Tests" $ do
 
         plan <- T.readFile "examples/frequency/multiple.weave" >>= return . parsePlan
@@ -34,7 +34,8 @@ spec = do
           MalformedPlan e -> error $ "Parsing shouldn't have failed" ++ show e
           Success (Plan l) -> do
             length l `shouldBe` 2
-            head l `shouldSatisfy` (\p -> correctStmt (N 1) (Offset 1000) $ getStmt p)
+            head l `shouldSatisfy` (\p -> correctStmt Once (Offset 1000) $ getStmt p)
+            last l `shouldSatisfy` (\p -> correctStmt Continuous (Offset 5000) p)
               where getStmt (Just s) = s
                     getStmt _        = error "No plan parsed"
 
